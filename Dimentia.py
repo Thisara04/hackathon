@@ -5,7 +5,7 @@ st.title("Simple Streamlit Demo App")
 st.write("This app calculates the square and cube of a number you enter.")
 
 # User input
-num = st.number_input("Enter a number:", value=1, step=1)
+num = st.number_input("Enter a number:", value=1, step=1)  
 
 # Calculations
 square = num ** 2
