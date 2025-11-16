@@ -8,8 +8,10 @@ st.title("Dementia Risk Prediction")
 st.write("Enter patient details to estimate dementia risk.")
 st.write("Assist a co-participant to help the process!!")
 
-MODEL_PATH = "ensemble_calibrated.pkl"
+MODEL_PATH = "Dementia_model.pkl"  
+COLUMNS_PATH = "model_columns.pkl"  
 
+# Load model
 if os.path.exists(MODEL_PATH):
     model = joblib.load(MODEL_PATH)
     st.success("Model loaded successfully!")
@@ -17,8 +19,18 @@ else:
     st.error(f"Model file not found at {MODEL_PATH}")
     st.stop()  
 
+# Load model columns
+if os.path.exists(COLUMNS_PATH):
+    model_columns = joblib.load(COLUMNS_PATH)
+else:
+    st.error(f"Model columns file not found at {COLUMNS_PATH}")
+    st.stop()
 
+# Predict function
 def predict(input_df):
+    # Reorder and add missing columns to match training
+    input_df = input_df.reindex(columns=model_columns, fill_value=0)
+    
     if hasattr(model, "predict_proba"):
         prob = model.predict_proba(input_df)[0]
         pred_class = int(np.argmax(prob))
@@ -541,4 +553,3 @@ if st.button("Predict"):
     st.write(f"Predicted Dementia State: **{prediction_label[prediction]}**")
     st.write(f"Probability of Non-Dementia: {prediction_prob[0]*100:.2f}%")
     st.write(f"Probability of Risk of Dementia: {prediction_prob[1]*100:.2f}%")
-
