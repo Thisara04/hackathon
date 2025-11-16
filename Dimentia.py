@@ -9,7 +9,7 @@ num = st.number_input("Enter a number:", value=1, step=1)
 
 # Calculations
 square = num ** 2
-cube = num ** 3
+cube = num ** 3 
 
 # Display results
 st.write(f"The square of {num} is {square}")
