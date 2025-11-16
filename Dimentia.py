@@ -533,10 +533,12 @@ def user_input_features():
 input_df = user_input_features()
 
 if st.button("Predict"):
-    prediction, prediction_prob = dummy_predict(input_df)
+    prediction, prediction_prob = predict(input_df)
+    
     prediction_label = {0: "Non-Dementia", 1: "Risk of Dementia"}
 
     st.subheader("Prediction Result")
     st.write(f"Predicted Dementia State: **{prediction_label[prediction]}**")
     st.write(f"Probability of Non-Dementia: {prediction_prob[0]*100:.2f}%")
     st.write(f"Probability of Risk of Dementia: {prediction_prob[1]*100:.2f}%")
+
