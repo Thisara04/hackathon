@@ -8,7 +8,7 @@ st.title("Dementia Risk Prediction")
 st.write("Enter patient details to estimate dementia risk.")
 st.write("Assist a co-participant to help the process!!")
 
-MODEL_PATH = "Dementia_model.pkl"
+MODEL_PATH = "ensemble_calibrated.pkl"
 
 if os.path.exists(MODEL_PATH):
     model = joblib.load(MODEL_PATH)
