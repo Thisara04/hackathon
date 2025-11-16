@@ -9,4 +9,3 @@ catboost
 joblib
 gdown
 requests
-os
