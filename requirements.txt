@@ -2,11 +2,8 @@ streamlit
 pandas
 numpy
 scikit-learn
-matplotlib
-seaborn
-xgboost 
-catboost
 joblib
-gdown
-requests
-sentence_transformers
+sentence-transformers
+torch
+transformers
+catboost
