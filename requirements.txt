@@ -9,3 +9,4 @@ catboost
 joblib
 gdown
 requests
+sentence_transformers
