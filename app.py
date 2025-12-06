@@ -1,169 +1,134 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import joblib
-import plotly.express as px
 import requests
+import re
+from datetime import datetime
+from bs4 import BeautifulSoup
 import xml.etree.ElementTree as ET
-from sentence_transformers import SentenceTransformer
-from streamlit_autorefresh import st_autorefresh
 
-# =========================================================
-# PAGE CONFIG + AUTO REFRESH
-# =========================================================
-st.set_page_config(page_title="News Intelligence Dashboard", layout="wide")
+# --------------------------------------------------------------
+# Page config
+# --------------------------------------------------------------
+st.set_page_config(page_title="DailyMirror RSS Dashboard", layout="wide")
 
-# Auto-refresh every 10 minutes (600,000 ms)
-st_autorefresh(interval=600_000, key="refresh")
+# --------------------------------------------------------------
+# Auto-refresh every 10 minutes
+# --------------------------------------------------------------
+st_autorefresh = st.experimental_rerun
+st_autorefresh_counter = st.experimental_memo
 
-# =========================================================
-# LOAD MODELS
-# =========================================================
-@st.cache_resource
-def load_models():
-    embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-    classifier = joblib.load("category_model.pkl")  # CatBoost model
-    return embedder, classifier
+st.experimental_set_query_params()   # lightweight refresh anchor
+st.toast("Auto refreshing every 10 minutes…")
+st.experimental_autorefresh(interval=600000, key="refresh10min")
 
-embedder, classifier = load_models()
+RSS_URL = "https://www.dailymirror.lk/RSS_Feeds/breaking_news"
 
-# Mapping from classifier output → readable sector
-sector_map = {
-    0: "Energy", 1: "Logistics", 2: "Education", 3: "Health",
-    4: "Finance", 5: "Government", 6: "Tourism", 7: "Agriculture",
-    8: "Social", 9: "Technology", 10: "Economy", 11: "Other"
-}
+# --------------------------------------------------------------
+# Clean malformed RSS text
+# --------------------------------------------------------------
+def clean_rss_xml(text: str) -> str:
+    # Remove unescaped '&'
+    text = re.sub(r"&(?!(amp;|lt;|gt;|quot;|apos;))", "&amp;", text)
 
-# =========================================================
-# SCORING KEYWORDS
-# =========================================================
-def calc_score(text, words):
-    return sum(1 for w in words if w.lower() in text.lower())
+    # Remove stray CDATA endings
+    text = text.replace("]]> ]]>","")
 
-economy_kw = ['stock','rupee','inflation','currency','finance','economic']
-weather_kw = ['rain','flood','storm','temperature','drought']
-social_kw  = ['protest','strike','crowd','community']
-logistics_kw = ['traffic','accident','port','delivery','transport']
-tourism_kw = ['tourism','travel','hotel','tourist','visa']
+    # Remove bad unicode blocks
+    text = re.sub(r"[^\x09\x0A\x0D\x20-\x7F]+", " ", text)
 
-def generate_insight(r):
-    insights = []
-    if r["Economy_Score"] >= 2: insights.append("Economic risk rising")
-    if r["Weather_Score"] >= 1: insights.append("Weather disruption possible")
-    if r["Social_Score"] >= 1: insights.append("Social unrest warning")
-    if r["Logistics_Score"] >= 1: insights.append("Transport/Logistics alert")
-    if r["Tourism_Score"] >= 1: insights.append("Tourism opportunity")
+    return text
 
-    return "; ".join(insights) if insights else "Normal"
+# --------------------------------------------------------------
+# Parse RSS safely even if corrupted
+# --------------------------------------------------------------
+def fetch_rss():
+    resp = requests.get(RSS_URL, timeout=10)
+    raw = resp.text
+    cleaned = clean_rss_xml(raw)
 
-# =========================================================
-# RSS FEED PARSER
-# =========================================================
-def fetch_rss(url):
-    response = requests.get(url)
-    root = ET.fromstring(response.content)
+    # Try parsing using BeautifulSoup (more forgiving)
+    soup = BeautifulSoup(cleaned, "xml")
 
-    items = []
-    for item in root.findall(".//item"):
-        title = item.findtext("title", "")
-        pub_date = item.findtext("pubDate", "")
-        link = item.findtext("link", "")
-        items.append([title, pub_date, link])
+    items = soup.find_all("item")
 
-    df = pd.DataFrame(items, columns=["Content", "Published", "Link"])
+    records = []
+    for it in items:
+        title = it.title.text.strip() if it.title else ""
+        link = it.link.text.strip() if it.link else ""
+        pub = it.pubDate.text.strip() if it.pubDate else ""
 
-    # time features (sin/cos transforms)
-    df["Published"] = pd.to_datetime(df["Published"], errors="coerce")
-    df["month"] = df["Published"].dt.month
-    df["dow"] = df["Published"].dt.dayofweek
+        # Try extract image
+        img = ""
+        enclosure = it.find("enclosure")
+        if enclosure and enclosure.get("url"):
+            img = enclosure.get("url")
 
-    df["Month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
-    df["Month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
-    df["DOW_sin"]   = np.sin(2 * np.pi * df["dow"] / 7)
-    df["DOW_cos"]   = np.cos(2 * np.pi * df["dow"] / 7)
+        records.append({
+            "title": title,
+            "link": link,
+            "pubDate": pub,
+            "image": img,
+        })
+    return pd.DataFrame(records)
+
+# --------------------------------------------------------------
+# Feature engineering
+# --------------------------------------------------------------
+def preprocess(df):
+    if df.empty:
+        return df
+
+    def parse_date(x):
+        try:
+            return datetime.strptime(x, "%Y-%m-%d %H:%M:%S")
+        except:
+            try:
+                return pd.to_datetime(x)
+            except:
+                return None
+
+    df["datetime"] = df["pubDate"].apply(parse_date)
+
+    df = df.dropna(subset=["datetime"])
+
+    df["month"] = df["datetime"].dt.month
+    df["dow"] = df["datetime"].dt.dayofweek
+
+    df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
+    df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
+    df["dow_sin"] = np.sin(2 * np.pi * df["dow"] / 7)
+    df["dow_cos"] = np.cos(2 * np.pi * df["dow"] / 7)
+
+    df["content"] = df["title"]  # we don't have description field
 
     return df
 
-# =========================================================
-# PROCESSING FUNCTION
-# =========================================================
-def process_dataframe(df):
-    # embeddings + time features
-    texts = df["Content"].tolist()
-    Xtext = embedder.encode(texts, convert_to_numpy=True)
-    Xtime = df[["Month_sin", "Month_cos", "DOW_sin", "DOW_cos"]].to_numpy()
+# --------------------------------------------------------------
+# MAIN APP
+# --------------------------------------------------------------
+st.title("📰 DailyMirror Live RSS Dashboard")
 
-    X = np.hstack([Xtext, Xtime])
+with st.spinner("Fetching RSS feed…"):
+    df = fetch_rss()
 
-    # Predict category
-    df["SectorID"] = classifier.predict(X)
-    df["Sector"] = df["SectorID"].map(sector_map)
+st.subheader("Raw News Items")
+st.dataframe(df, use_container_width=True)
 
-    # Keyword scoring
-    df["Economy_Score"] = df["Content"].apply(lambda x: calc_score(x, economy_kw))
-    df["Weather_Score"]  = df["Content"].apply(lambda x: calc_score(x, weather_kw))
-    df["Social_Score"]   = df["Content"].apply(lambda x: calc_score(x, social_kw))
-    df["Logistics_Score"] = df["Content"].apply(lambda x: calc_score(x, logistics_kw))
-    df["Tourism_Score"]   = df["Content"].apply(lambda x: calc_score(x, tourism_kw))
+if not df.empty:
+    df = preprocess(df)
 
-    df["Insight"] = df.apply(generate_insight, axis=1)
-    return df
+    st.subheader("Pre-processed Features")
+    st.dataframe(df, use_container_width=True)
 
-# =========================================================
-# UI
-# =========================================================
-st.title("📊 News Intelligence Dashboard (RSS + CSV + ML)")
+    # Monthly count
+    st.subheader("Monthly News Distribution")
+    monthly = df.groupby("month").size().reset_index(name="count")
+    st.bar_chart(monthly, x="month", y="count")
 
-mode = st.radio("Choose Input Method:", ["RSS (Auto-Refresh)", "Upload CSV"])
+    # Day of week
+    st.subheader("Day-Of-Week Distribution")
+    dow = df.groupby("dow").size().reset_index(name="count")
+    st.bar_chart(dow, x="dow", y="count")
 
-# ---------------------------------------------------------
-# OPTION 1 — RSS FEED
-# ---------------------------------------------------------
-if mode == "RSS (Auto-Refresh)":
-    st.subheader("🔄 Auto-Fetching DailyMirror Breaking News (Every 10 Minutes)")
-    rss_url = "https://www.dailymirror.lk/RSS_Feeds/breaking_news"
-
-    df_rss = fetch_rss(rss_url)
-    df_rss = process_dataframe(df_rss)
-
-    st.dataframe(df_rss[["Content","Published","Sector","Insight","Link"]])
-
-    # VISUALS
-    st.subheader("📈 Sector Distribution")
-    fig1 = px.bar(df_rss["Sector"].value_counts(), title="News Count per Sector")
-    st.plotly_chart(fig1)
-
-    st.subheader("🔥 Risk Heatmap")
-    heat = df_rss.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
-    fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
-    st.plotly_chart(fig2)
-
-# ---------------------------------------------------------
-# OPTION 2 — CSV INPUT
-# ---------------------------------------------------------
-else:
-    st.subheader("📂 Upload CSV File")
-    uploaded = st.file_uploader("Upload CSV", type=["csv"])
-
-    if uploaded:
-        df = pd.read_csv(uploaded)
-        df = process_dataframe(df)
-
-        st.dataframe(df[["Content","Sector","Insight"]])
-
-        # VISUALS
-        st.subheader("📈 Sector Distribution")
-        fig1 = px.bar(df["Sector"].value_counts(), title="News Count per Sector")
-        st.plotly_chart(fig1)
-
-        st.subheader("🔥 Risk Heatmap")
-        heat = df.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
-        fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
-        st.plotly_chart(fig2)
-
-        st.download_button(
-            "Download Results",
-            df.to_csv(index=False),
-            "processed_news.csv",
-            "text/csv"
-        )
+st.success("Dashboard updated!")
