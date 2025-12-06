@@ -1,129 +1,217 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import joblib
 import requests
 import re
 from datetime import datetime
 from bs4 import BeautifulSoup
+from sentence_transformers import SentenceTransformer
+import plotly.express as px
 
-# --------------------------------------------------------------
-# Page config
-# --------------------------------------------------------------
-st.set_page_config(page_title="DailyMirror RSS Dashboard", layout="wide")
+# -----------------------------
+# Page Config
+# -----------------------------
+st.set_page_config(page_title="News Intelligence Dashboard", layout="wide")
+st.title("📰 Sri Lanka News Intelligence Dashboard (Phase 3–5)")
 
-# --------------------------------------------------------------
-# Auto-refresh every 10 minutes
-# --------------------------------------------------------------
-# 10 minutes = 600,000 milliseconds
-from streamlit_autorefresh import st_autorefresh
-st_autorefresh(interval=600_000, key="refresh10min")
+# -----------------------------
+# Load Models
+# -----------------------------
+@st.cache_resource
+def load_models():
+    embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+    classifier = joblib.load("category_model.pkl")
+    return embedder, classifier
 
-RSS_URL = "https://www.dailymirror.lk/RSS_Feeds/breaking_news"
+embedder, classifier = load_models()
 
-# --------------------------------------------------------------
-# Clean malformed RSS text
-# --------------------------------------------------------------
-def clean_rss_xml(text: str) -> str:
-    # Remove unescaped '&'
+sector_map = {
+    0: "Energy", 1: "Logistics", 2: "Education", 3: "Health",
+    4: "Finance", 5: "Government", 6: "Tourism", 7: "Agriculture",
+    8: "Social", 9: "Technology", 10: "Economy", 11: "Other"
+}
+
+# -----------------------------
+# Keyword scoring
+# -----------------------------
+def calc_score(text, words):
+    return sum(1 for w in words if w.lower() in text.lower())
+
+economy_kw = ['stock','rupee','inflation','currency','finance','economic']
+weather_kw = ['rain','flood','storm','temperature','drought']
+social_kw = ['protest','strike','crowd','community']
+logistics_kw = ['traffic','accident','port','delivery','transport']
+tourism_kw = ['tourism','travel','hotel','tourist','visa']
+
+def generate_insight(r):
+    insights = []
+    if r["Economy_Score"] >= 2: insights.append("Economic risk rising")
+    if r["Weather_Score"] >= 1: insights.append("Weather disruption possible")
+    if r["Social_Score"] >= 1: insights.append("Social unrest warning")
+    if r["Logistics_Score"] >= 1: insights.append("Transport/Logistics alert")
+    if r["Tourism_Score"] >= 1: insights.append("Tourism opportunity")
+    return "; ".join(insights) if insights else "Normal"
+
+# -----------------------------
+# RSS Fetching
+# -----------------------------
+RSS_FEEDS = [
+    "https://www.dailymirror.lk/RSS_Feeds/breaking_news",
+    "https://www.dailymirror.lk/rss/business_24_7/395",
+    "https://www.dailymirror.lk/rss/top_story/155"
+]
+
+def clean_rss_xml(text):
     text = re.sub(r"&(?!(amp;|lt;|gt;|quot;|apos;))", "&amp;", text)
-    # Remove stray CDATA endings
     text = text.replace("]]> ]]>","")
-    # Remove bad unicode blocks
     text = re.sub(r"[^\x09\x0A\x0D\x20-\x7F]+", " ", text)
     return text
 
-# --------------------------------------------------------------
-# Parse RSS safely even if corrupted
-# --------------------------------------------------------------
-def fetch_rss():
+def fetch_rss(url):
     try:
-        resp = requests.get(RSS_URL, timeout=10)
-        raw = resp.text
-        cleaned = clean_rss_xml(raw)
-
-        # Parse using BeautifulSoup
+        resp = requests.get(url, timeout=10)
+        cleaned = clean_rss_xml(resp.text)
         soup = BeautifulSoup(cleaned, "xml")
         items = soup.find_all("item")
-
         records = []
         for it in items:
             title = it.title.text.strip() if it.title else ""
             link = it.link.text.strip() if it.link else ""
             pub = it.pubDate.text.strip() if it.pubDate else ""
-
-            # Try extract image
             img = ""
             enclosure = it.find("enclosure")
             if enclosure and enclosure.get("url"):
                 img = enclosure.get("url")
-
-            records.append({
-                "title": title,
-                "link": link,
-                "pubDate": pub,
-                "image": img,
-            })
+            records.append({"title": title, "link": link, "pubDate": pub, "image": img})
         return pd.DataFrame(records)
-    except Exception as e:
-        st.error(f"Failed to fetch RSS: {e}")
+    except:
         return pd.DataFrame()
 
-# --------------------------------------------------------------
-# Feature engineering
-# --------------------------------------------------------------
-def preprocess(df):
-    if df.empty:
-        return df
+# -----------------------------
+# NewsAPI Fetching
+# -----------------------------
+NEWSAPI_KEY = "681548c940d14836b6edbb62b1d39442"
 
-    def parse_date(x):
-        try:
-            return datetime.strptime(x, "%Y-%m-%d %H:%M:%S")
-        except:
+def fetch_newsapi():
+    url = f"https://newsapi.org/v2/everything?q=sri+lanka&sortBy=publishedAt&apiKey={NEWSAPI_KEY}"
+    try:
+        resp = requests.get(url).json()
+        articles = resp.get("articles", [])
+        records = []
+        for art in articles:
+            published = art.get("publishedAt","")
             try:
-                return pd.to_datetime(x)
+                dt = datetime.fromisoformat(published.replace("Z",""))
             except:
-                return None
+                dt = None
+            records.append({
+                "title": art.get("title",""),
+                "link": art.get("url",""),
+                "pubDate": dt,
+                "image": "",
+                "source": art.get("source",{}).get("name","")
+            })
+        return pd.DataFrame(records)
+    except:
+        return pd.DataFrame()
 
+# -----------------------------
+# Preprocess
+# -----------------------------
+def preprocess(df):
+    if df.empty: return df
+    def parse_date(x):
+        try: return pd.to_datetime(x)
+        except: return None
     df["datetime"] = df["pubDate"].apply(parse_date)
     df = df.dropna(subset=["datetime"])
-
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
-
-    df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
-    df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
-    df["dow_sin"] = np.sin(2 * np.pi * df["dow"] / 7)
-    df["dow_cos"] = np.cos(2 * np.pi * df["dow"] / 7)
-
-    df["content"] = df["title"]  # we don't have description field
-
+    df["month_sin"] = np.sin(2*np.pi*df["month"]/12)
+    df["month_cos"] = np.cos(2*np.pi*df["month"]/12)
+    df["dow_sin"] = np.sin(2*np.pi*df["dow"]/7)
+    df["dow_cos"] = np.cos(2*np.pi*df["dow"]/7)
+    df["Content"] = df["title"]
     return df
 
-# --------------------------------------------------------------
-# MAIN APP
-# --------------------------------------------------------------
-st.title("📰 DailyMirror Live RSS Dashboard")
+# -----------------------------
+# Load Existing Data
+# -----------------------------
+try:
+    cache_df = pd.read_csv("news_cache.csv")
+except:
+    cache_df = pd.DataFrame()
 
-with st.spinner("Fetching RSS feed…"):
-    df = fetch_rss()
+# -----------------------------
+# Fetch New Data
+# -----------------------------
+new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)
+new_api = fetch_newsapi()
+all_news = pd.concat([cache_df, new_rss, new_api], ignore_index=True)
+all_news.drop_duplicates(subset=["link"], inplace=True)
+all_news = preprocess(all_news)
 
-st.subheader("Raw News Items")
-st.dataframe(df, use_container_width=True)
+# Save cache
+all_news.to_csv("news_cache.csv", index=False)
 
-if not df.empty:
-    df = preprocess(df)
+st.subheader("Latest News")
+st.dataframe(all_news[["datetime","Content","link"]], use_container_width=True)
 
-    st.subheader("Pre-processed Features")
-    st.dataframe(df, use_container_width=True)
+# -----------------------------
+# Prediction
+# -----------------------------
+if not all_news.empty:
+    X_text = all_news["Content"].tolist()
+    X_emb = embedder.encode(X_text, convert_to_numpy=True)
+    X_time = all_news[["month_sin","month_cos","dow_sin","dow_cos"]].to_numpy()
+    X = np.hstack([X_emb, X_time])
+    all_news["SectorID"] = classifier.predict(X)
+    all_news["Sector"] = all_news["SectorID"].map(sector_map)
 
-    # Monthly count
-    st.subheader("Monthly News Distribution")
-    monthly = df.groupby("month").size().reset_index(name="count")
-    st.bar_chart(monthly.set_index("month")["count"])
+    # -----------------------------
+    # Risk Signals
+    # -----------------------------
+    all_news["Economy_Score"] = all_news["Content"].apply(lambda x: calc_score(x, economy_kw))
+    all_news["Weather_Score"] = all_news["Content"].apply(lambda x: calc_score(x, weather_kw))
+    all_news["Social_Score"] = all_news["Content"].apply(lambda x: calc_score(x, social_kw))
+    all_news["Logistics_Score"] = all_news["Content"].apply(lambda x: calc_score(x, logistics_kw))
+    all_news["Tourism_Score"] = all_news["Content"].apply(lambda x: calc_score(x, tourism_kw))
+    all_news["Insight"] = all_news.apply(generate_insight, axis=1)
 
-    # Day of week
-    st.subheader("Day-Of-Week Distribution")
-    dow = df.groupby("dow").size().reset_index(name="count")
-    st.bar_chart(dow.set_index("dow")["count"])
+    # -----------------------------
+    # Visualizations
+    # -----------------------------
+    st.header("📈 Analytics & Visualizations")
 
-st.success("Dashboard updated!")
+    # Sector Distribution
+    st.subheader("Sector Distribution")
+    fig1 = px.bar(all_news["Sector"].value_counts(), title="News Count per Sector")
+    st.plotly_chart(fig1)
+
+    # Risk Heatmap
+    st.subheader("Risk Score Heatmap")
+    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
+    fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
+    st.plotly_chart(fig2)
+
+    # Risk Summary Metrics
+    st.subheader("Risk Summary")
+    col1, col2, col3, col4, col5 = st.columns(5)
+    col1.metric("Economy Alerts", heat["Economy_Score"].sum())
+    col2.metric("Weather Alerts", heat["Weather_Score"].sum())
+    col3.metric("Social Alerts", heat["Social_Score"].sum())
+    col4.metric("Logistics Alerts", heat["Logistics_Score"].sum())
+    col5.metric("Tourism Signals", heat["Tourism_Score"].sum())
+
+    # Top Insights
+    st.subheader("Top Insights")
+    st.dataframe(all_news[["Content","Sector","Insight"]])
+
+    # Download results
+    st.download_button(
+        label="Download Output CSV",
+        data=all_news.to_csv(index=False),
+        file_name="signals_output.csv",
+        mime="text/csv"
+    )
