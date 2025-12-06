@@ -9,3 +9,5 @@ sentence-transformers
 matplotlib
 wordcloud
 catboost
+torch
+Pillow
