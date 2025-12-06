@@ -9,3 +9,4 @@ sentence-transformers
 scikit-learn
 catboost
 lxml
+beautifulsoup4
