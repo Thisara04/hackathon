@@ -1,12 +1,6 @@
-streamlit
-streamlit-autorefresh
+streamlit>=1.20
 pandas
 numpy
-joblib
-plotly
 requests
-sentence-transformers
-scikit-learn
-catboost
-lxml
 beautifulsoup4
+streamlit-autorefresh
