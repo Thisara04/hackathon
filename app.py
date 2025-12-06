@@ -3,39 +3,31 @@ import pandas as pd
 import numpy as np
 import joblib
 import plotly.express as px
-import feedparser
-import time
-from datetime import datetime
+import requests
+import xml.etree.ElementTree as ET
 from sentence_transformers import SentenceTransformer
-from wordcloud import WordCloud
-import matplotlib.pyplot as plt
+from streamlit_autorefresh import st_autorefresh
 
 # =========================================================
-# AUTO REFRESH EVERY 10 MINUTES
+# PAGE CONFIG + AUTO REFRESH
 # =========================================================
-# 10 minutes = 600 seconds
-st.experimental_set_page_config(page_title="News Intelligence Dashboard", layout="wide")
-st_autorefresh = st.experimental_memo
-st_autorefresh_counter = st.experimental_rerun
+st.set_page_config(page_title="News Intelligence Dashboard", layout="wide")
 
-st_autorefresh(interval=600000)   # 600000 ms = 10 minutes
-
+# Auto-refresh every 10 minutes (600,000 ms)
+st_autorefresh(interval=600_000, key="refresh")
 
 # =========================================================
 # LOAD MODELS
 # =========================================================
 @st.cache_resource
-def load_all_models():
+def load_models():
     embedder = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-    classifier = joblib.load("category_model.pkl")  # CatBoost classifier
-    kmeans = joblib.load("kmeans.pkl")              # K-means clustering model
-    return embedder, classifier, kmeans
+    classifier = joblib.load("category_model.pkl")  # CatBoost model
+    return embedder, classifier
 
-embedder, classifier, kmeans = load_all_models()
+embedder, classifier = load_models()
 
-# =========================================================
-# SECTOR MAP
-# =========================================================
+# Mapping from classifier output → readable sector
 sector_map = {
     0: "Energy", 1: "Logistics", 2: "Education", 3: "Health",
     4: "Finance", 5: "Government", 6: "Tourism", 7: "Agriculture",
@@ -43,177 +35,135 @@ sector_map = {
 }
 
 # =========================================================
-# KEYWORDS
+# SCORING KEYWORDS
 # =========================================================
 def calc_score(text, words):
     return sum(1 for w in words if w.lower() in text.lower())
 
 economy_kw = ['stock','rupee','inflation','currency','finance','economic']
 weather_kw = ['rain','flood','storm','temperature','drought']
-social_kw = ['protest','strike','crowd','community']
+social_kw  = ['protest','strike','crowd','community']
 logistics_kw = ['traffic','accident','port','delivery','transport']
 tourism_kw = ['tourism','travel','hotel','tourist','visa']
 
-
 def generate_insight(r):
-    ideas = []
-    if r["Economy_Score"] >= 2: ideas.append("Economic risk rising")
-    if r["Weather_Score"] >= 1: ideas.append("Weather disruption possible")
-    if r["Social_Score"] >= 1: ideas.append("Social unrest warning")
-    if r["Logistics_Score"] >= 1: ideas.append("Transport/Logistics alert")
-    if r["Tourism_Score"] >= 1: ideas.append("Tourism opportunity")
-    return "; ".join(ideas) if ideas else "Normal"
+    insights = []
+    if r["Economy_Score"] >= 2: insights.append("Economic risk rising")
+    if r["Weather_Score"] >= 1: insights.append("Weather disruption possible")
+    if r["Social_Score"] >= 1: insights.append("Social unrest warning")
+    if r["Logistics_Score"] >= 1: insights.append("Transport/Logistics alert")
+    if r["Tourism_Score"] >= 1: insights.append("Tourism opportunity")
 
-
-# =========================================================
-# READ RSS FEEDS
-# =========================================================
-RSS_FEEDS = [
-    "https://www.newsfirst.lk/feed/",
-    "https://www.dailymirror.lk/rss/latest/",
-    "https://economynext.com/feed/",
-]
-
-def fetch_rss_news():
-    rows = []
-    for url in RSS_FEEDS:
-        feed = feedparser.parse(url)
-        for entry in feed.entries[:25]:   # Take latest 25 per source
-            rows.append({
-                "Title": entry.title,
-                "Content": entry.summary if "summary" in entry else entry.title,
-                "Published": entry.published if "published" in entry else "",
-            })
-    return pd.DataFrame(rows)
-
+    return "; ".join(insights) if insights else "Normal"
 
 # =========================================================
-# PAGE TITLE
+# RSS FEED PARSER
 # =========================================================
-st.title("📡 Real-Time News Intelligence Dashboard")
+def fetch_rss(url):
+    response = requests.get(url)
+    root = ET.fromstring(response.content)
 
-st.caption("Auto-updates every **10 minutes** | Powered by RSS feeds")
+    items = []
+    for item in root.findall(".//item"):
+        title = item.findtext("title", "")
+        pub_date = item.findtext("pubDate", "")
+        link = item.findtext("link", "")
+        items.append([title, pub_date, link])
 
+    df = pd.DataFrame(items, columns=["Content", "Published", "Link"])
 
-# =========================================================
-# FETCH NEWS LIVE
-# =========================================================
-st.subheader("⏳ Fetching latest live news…")
+    # time features (sin/cos transforms)
+    df["Published"] = pd.to_datetime(df["Published"], errors="coerce")
+    df["month"] = df["Published"].dt.month
+    df["dow"] = df["Published"].dt.dayofweek
 
-raw_df = fetch_rss_news()
+    df["Month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
+    df["Month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
+    df["DOW_sin"]   = np.sin(2 * np.pi * df["dow"] / 7)
+    df["DOW_cos"]   = np.cos(2 * np.pi * df["dow"] / 7)
 
-
-# =========================================================
-# ADD TIME FEATURES (Month & Day of Week Encoding)
-# =========================================================
-raw_df["Published"] = pd.to_datetime(raw_df["Published"], errors="coerce").fillna(datetime.now())
-raw_df["Month"] = raw_df["Published"].dt.month
-raw_df["DOW"] = raw_df["Published"].dt.dayofweek
-
-raw_df["Month_sin"] = np.sin(2 * np.pi * raw_df["Month"] / 12)
-raw_df["Month_cos"] = np.cos(2 * np.pi * raw_df["Month"] / 12)
-raw_df["DOW_sin"] = np.sin(2 * np.pi * raw_df["DOW"] / 7)
-raw_df["DOW_cos"] = np.cos(2 * np.pi * raw_df["DOW"] / 7)
-
-
-# =========================================================
-# EMBEDDINGS
-# =========================================================
-st.subheader("📘 Processing text with embeddings…")
-
-text_list = raw_df["Content"].tolist()
-X_text = embedder.encode(text_list, convert_to_numpy=True)
-
-X_time = raw_df[["Month_sin","Month_cos","DOW_sin","DOW_cos"]].to_numpy()
-X = np.hstack([X_text, X_time])
-
+    return df
 
 # =========================================================
-# CATBOOST CLASSIFICATION
+# PROCESSING FUNCTION
 # =========================================================
-raw_df["SectorID"] = classifier.predict(X)
-raw_df["Sector"] = raw_df["SectorID"].map(sector_map)
+def process_dataframe(df):
+    # embeddings + time features
+    texts = df["Content"].tolist()
+    Xtext = embedder.encode(texts, convert_to_numpy=True)
+    Xtime = df[["Month_sin", "Month_cos", "DOW_sin", "DOW_cos"]].to_numpy()
 
+    X = np.hstack([Xtext, Xtime])
+
+    # Predict category
+    df["SectorID"] = classifier.predict(X)
+    df["Sector"] = df["SectorID"].map(sector_map)
+
+    # Keyword scoring
+    df["Economy_Score"] = df["Content"].apply(lambda x: calc_score(x, economy_kw))
+    df["Weather_Score"]  = df["Content"].apply(lambda x: calc_score(x, weather_kw))
+    df["Social_Score"]   = df["Content"].apply(lambda x: calc_score(x, social_kw))
+    df["Logistics_Score"] = df["Content"].apply(lambda x: calc_score(x, logistics_kw))
+    df["Tourism_Score"]   = df["Content"].apply(lambda x: calc_score(x, tourism_kw))
+
+    df["Insight"] = df.apply(generate_insight, axis=1)
+    return df
 
 # =========================================================
-# K-MEANS CLUSTERING
+# UI
 # =========================================================
-raw_df["Cluster"] = kmeans.predict(X_text)
+st.title("📊 News Intelligence Dashboard (RSS + CSV + ML)")
 
+mode = st.radio("Choose Input Method:", ["RSS (Auto-Refresh)", "Upload CSV"])
 
-# =========================================================
-# SIGNAL SCORING
-# =========================================================
-raw_df["Economy_Score"] = raw_df["Content"].apply(lambda x: calc_score(x, economy_kw))
-raw_df["Weather_Score"] = raw_df["Content"].apply(lambda x: calc_score(x, weather_kw))
-raw_df["Social_Score"] = raw_df["Content"].apply(lambda x: calc_score(x, social_kw))
-raw_df["Logistics_Score"] = raw_df["Content"].apply(lambda x: calc_score(x, logistics_kw))
-raw_df["Tourism_Score"] = raw_df["Content"].apply(lambda x: calc_score(x, tourism_kw))
+# ---------------------------------------------------------
+# OPTION 1 — RSS FEED
+# ---------------------------------------------------------
+if mode == "RSS (Auto-Refresh)":
+    st.subheader("🔄 Auto-Fetching DailyMirror Breaking News (Every 10 Minutes)")
+    rss_url = "https://www.dailymirror.lk/RSS_Feeds/breaking_news"
 
-raw_df["Insight"] = raw_df.apply(generate_insight, axis=1)
+    df_rss = fetch_rss(rss_url)
+    df_rss = process_dataframe(df_rss)
 
+    st.dataframe(df_rss[["Content","Published","Sector","Insight","Link"]])
 
-# =========================================================
-# VISUALIZATIONS
-# =========================================================
-st.header("📊 Analytics Dashboard")
+    # VISUALS
+    st.subheader("📈 Sector Distribution")
+    fig1 = px.bar(df_rss["Sector"].value_counts(), title="News Count per Sector")
+    st.plotly_chart(fig1)
 
-# -----------------------------
-# 1. Sector Distribution
-# -----------------------------
-st.subheader("1️⃣ Sector Distribution")
-fig1 = px.bar(
-    raw_df["Sector"].value_counts(),
-    title="Distribution of Latest News Across Sectors"
-)
-st.plotly_chart(fig1, use_container_width=True)
+    st.subheader("🔥 Risk Heatmap")
+    heat = df_rss.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
+    fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
+    st.plotly_chart(fig2)
 
+# ---------------------------------------------------------
+# OPTION 2 — CSV INPUT
+# ---------------------------------------------------------
+else:
+    st.subheader("📂 Upload CSV File")
+    uploaded = st.file_uploader("Upload CSV", type=["csv"])
 
-# -----------------------------
-# 2. Cluster Distribution
-# -----------------------------
-st.subheader("2️⃣ News Topic Clusters")
-fig_cluster = px.histogram(raw_df, x="Cluster", title="Cluster Frequency")
-st.plotly_chart(fig_cluster, use_container_width=True)
+    if uploaded:
+        df = pd.read_csv(uploaded)
+        df = process_dataframe(df)
 
+        st.dataframe(df[["Content","Sector","Insight"]])
 
-# -----------------------------
-# 3. Heatmap
-# -----------------------------
-st.subheader("3️⃣ Risk Heatmap")
-heat = raw_df.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score",
-                                 "Logistics_Score","Tourism_Score"]].sum()
+        # VISUALS
+        st.subheader("📈 Sector Distribution")
+        fig1 = px.bar(df["Sector"].value_counts(), title="News Count per Sector")
+        st.plotly_chart(fig1)
 
-fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
-st.plotly_chart(fig2, use_container_width=True)
+        st.subheader("🔥 Risk Heatmap")
+        heat = df.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
+        fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
+        st.plotly_chart(fig2)
 
-
-# -----------------------------
-# 4. Word Cloud
-# -----------------------------
-st.subheader("4️⃣ Word Cloud")
-all_text = " ".join(raw_df["Content"].astype(str).tolist())
-wc = WordCloud(width=1200, height=500).generate(all_text)
-
-fig_wc, ax = plt.subplots(figsize=(12,6))
-ax.imshow(wc, interpolation="bilinear")
-ax.axis("off")
-st.pyplot(fig_wc)
-
-
-# -----------------------------
-# 5. Insights Table
-# -----------------------------
-st.subheader("5️⃣ Insights Table")
-st.dataframe(raw_df[["Title","Sector","Cluster","Insight","Published"]])
-
-
-# -----------------------------
-# 6. Download CSV
-# -----------------------------
-st.download_button(
-    label="⬇ Download Processed News CSV",
-    data=raw_df.to_csv(index=False),
-    file_name="live_news_output.csv",
-    mime="text/csv"
-)
+        st.download_button(
+            "Download Results",
+            df.to_csv(index=False),
+            "processed_news.csv",
+            "text/csv"
+        )
