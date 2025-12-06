@@ -2,8 +2,10 @@ streamlit
 pandas
 numpy
 scikit-learn
+plotly
+feedparser
 joblib
 sentence-transformers
-torch
-transformers
+matplotlib
+wordcloud
 catboost
