@@ -8,6 +8,8 @@ from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 import plotly.express as px
+from streamlit_autorefresh import st_autorefresh
+
 
 # -----------------------------
 # Page Config
