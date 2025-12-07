@@ -28,7 +28,7 @@ page = st.sidebar.radio(
 if st.sidebar.button("🔄 Update Now"):
     st.cache_data.clear()
     st.cache_resource.clear()
-    st.experimental_rerun()
+    st.rerun()
     
 # -----------------------------
 # Load Models
