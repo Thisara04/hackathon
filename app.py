@@ -226,9 +226,8 @@ if page == "Home":
     if not all_news.empty:
         st.subheader("Quick Summary")
 
-        # Filter news for last 24 hours and 4 hours
         now = datetime.now()
-        last_12h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=24)]
+        last_12h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=12)]
         last_4h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=4)]
 
         st.markdown("**Last 12 Hours**")
@@ -243,7 +242,6 @@ if page == "Home":
         col5.metric("Sectors Detected", last_4h["Sector"].nunique())
         col6.metric("Risk Alerts", (last_4h["Insight"] != "Normal").sum())
 
-
 # ============================================================
 # PAGE 2 — LATEST NEWS
 # ============================================================
@@ -251,7 +249,6 @@ elif page == "Latest News":
 
     st.title("📰 Latest News")
 
-    # Time filter
     time_range = st.radio("Select time range:", ["Last 12 hours", "Last 4 hours"])
     hours = 12 if time_range == "Last 12 hours" else 4
     filtered_news = filter_recent(all_news, hours=hours)
@@ -270,7 +267,8 @@ elif page == "Analytics":
     st.plotly_chart(fig1)
 
     st.subheader("Risk Score Heatmap")
-    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
+    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score",
+                                       "Logistics_Score","Tourism_Score"]].sum()
     fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
     st.plotly_chart(fig2)
 
@@ -281,7 +279,6 @@ elif page == "Risk Signals":
 
     st.title("⚠️ Risk Signals & Insights")
 
-    # Time filter
     time_range = st.radio("Select time range:", ["Last 12 hours", "Last 4 hours"])
     hours = 12 if time_range == "Last 12 hours" else 4
     filtered_news = filter_recent(all_news, hours=hours)
