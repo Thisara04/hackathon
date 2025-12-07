@@ -1,6 +1,11 @@
-streamlit>=1.20
+streamlit
 pandas
 numpy
+joblib
 requests
 beautifulsoup4
-streamlit-autorefresh
+sentence-transformers
+torch
+scikit-learn
+plotly
+lxml
