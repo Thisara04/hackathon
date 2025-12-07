@@ -11,3 +11,5 @@ plotly
 lxml
 catboost
 streamlit-autorefresh
+wordcloud
+matplotlib
