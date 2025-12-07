@@ -9,7 +9,10 @@ from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 import plotly.express as px
 from streamlit_autorefresh import st_autorefresh
-import tweepy  # NEW
+import tweepy  
+from wordcloud import WordCloud
+import matplotlib.pyplot as plt
+
 
 # -----------------------------
 # Page Config
@@ -284,16 +287,77 @@ elif page == "Latest News":
 # ============================================================
 elif page == "Analytics":
     st.title("📈 Analytics & Visualizations")
-    st.subheader("Sector Distribution")
-    fig1 = px.bar(all_news["Sector"].value_counts(), title="News Count per Sector")
-    st.plotly_chart(fig1)
 
-    st.subheader("Risk Score Heatmap")
-    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score",
-                                       "Social_Score","Logistics_Score",
-                                       "Tourism_Score"]].sum()
-    fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
-    st.plotly_chart(fig2)
+    # ---------------------------------------
+    # 1. TIMELINE CHART (Daily Article Count)
+    # ---------------------------------------
+    st.subheader("🕒 Timeline of News Volume (Last 7 Days)")
+
+    timeline_df = all_news.copy()
+    timeline_df["date"] = timeline_df["datetime"].dt.date
+    timeline_count = timeline_df.groupby("date").size().reset_index(name="count")
+
+    fig_timeline = px.line(
+        timeline_count,
+        x="date",
+        y="count",
+        markers=True,
+        title="Daily Article Count"
+    )
+    st.plotly_chart(fig_timeline, use_container_width=True)
+
+    # ---------------------------------------
+    # 2. PIE CHART (Sector Distribution)
+    # ---------------------------------------
+    st.subheader("📊 Sector Distribution")
+
+    sector_counts = all_news["Sector"].value_counts()
+    fig_pie = px.pie(
+        values=sector_counts.values,
+        names=sector_counts.index,
+        title="News per Sector",
+        hole=0.3
+    )
+    st.plotly_chart(fig_pie, use_container_width=True)
+
+    # ---------------------------------------
+    # 3. RISK TREND HEATMAP
+    # ---------------------------------------
+    st.subheader("🔥 Risk Trend Heatmap")
+
+    heat = all_news.groupby("Sector")[[
+        "Economy_Score","Weather_Score",
+        "Social_Score","Logistics_Score",
+        "Tourism_Score"
+    ]].sum()
+
+    fig_heat = px.imshow(
+        heat,
+        text_auto=True,
+        title="Risk Heatmap by Sector"
+    )
+    st.plotly_chart(fig_heat, use_container_width=True)
+
+    # ---------------------------------------
+    # 4. WORD CLOUD
+    # ---------------------------------------
+    st.subheader("☁️ Frequent Keywords (Word Cloud)")
+
+    text_blob = " ".join(all_news["Content"].astype(str).tolist())
+
+    wc = WordCloud(
+        width=1600,
+        height=800,
+        background_color="white",
+        collocations=False
+    ).generate(text_blob)
+
+    fig_wc = plt.figure(figsize=(12,6))
+    plt.imshow(wc, interpolation="bilinear")
+    plt.axis("off")
+
+    st.pyplot(fig_wc)
+
 
 # ============================================================
 # RISK SIGNALS PAGE
