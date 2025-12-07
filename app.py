@@ -8,7 +8,6 @@ from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 import plotly.express as px
-from dateutil import parser
 
 # -----------------------------
 # Page Config
@@ -62,11 +61,11 @@ tourism_kw = ['tourism','travel','hotel','tourist','visa']
 
 def generate_insight(r):
     insights = []
-    if r["Economy_Score"] >= 2: insights.append("Economic risk rising")
-    if r["Weather_Score"] >= 1: insights.append("Weather disruption possible")
-    if r["Social_Score"] >= 1: insights.append("Social unrest warning")
-    if r["Logistics_Score"] >= 1: insights.append("Transport/Logistics alert")
-    if r["Tourism_Score"] >= 1: insights.append("Tourism opportunity")
+    if r.get("Economy_Score",0) >= 2: insights.append("Economic risk rising")
+    if r.get("Weather_Score",0) >= 1: insights.append("Weather disruption possible")
+    if r.get("Social_Score",0) >= 1: insights.append("Social unrest warning")
+    if r.get("Logistics_Score",0) >= 1: insights.append("Transport/Logistics alert")
+    if r.get("Tourism_Score",0) >= 1: insights.append("Tourism opportunity")
     return "; ".join(insights) if insights else "Normal"
 
 # -----------------------------
@@ -94,7 +93,6 @@ def fetch_rss(url):
         soup = BeautifulSoup(cleaned, "xml")
         items = soup.find_all("item")
         records = []
-        now = datetime.now(timezone.utc)
         for it in items:
             title = it.title.text.strip() if it.title else ""
             link = it.link.text.strip() if it.link else ""
@@ -103,49 +101,38 @@ def fetch_rss(url):
             enclosure = it.find("enclosure")
             if enclosure and enclosure.get("url"):
                 img = enclosure.get("url")
-            try:
-                dt = parser.parse(pub)
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                else:
-                    dt = dt.astimezone(timezone.utc)
-            except:
-                dt = now
-            records.append({"title": title, "link": link, "pubDate": dt, "image": img})
+            records.append({"title": title, "link": link, "pubDate": pub, "image": img})
         return pd.DataFrame(records)
     except:
         return pd.DataFrame()
 
 # -----------------------------
-# NewsAPI Fetching (last 24 hours)
+# NewsAPI Fetching (last 24h only)
 # -----------------------------
 NEWSAPI_KEY = "681548c940d14836b6edbb62b1d39442"
 
 def fetch_newsapi():
-    now = datetime.now(timezone.utc)
-    from_dt = (now - pd.Timedelta(hours=24)).isoformat()
-    url = f"https://newsapi.org/v2/everything?q=sri+lanka&from={from_dt}&sortBy=publishedAt&apiKey={NEWSAPI_KEY}"
+    url = f"https://newsapi.org/v2/everything?q=sri+lanka&sortBy=publishedAt&apiKey={NEWSAPI_KEY}"
     try:
         resp = requests.get(url).json()
         articles = resp.get("articles", [])
         records = []
+        now = datetime.now(timezone.utc)
+        cutoff = now - pd.Timedelta(hours=24)
         for art in articles:
             published = art.get("publishedAt","")
             try:
-                dt = parser.parse(published)
-                if dt.tzinfo is None:
-                    dt = dt.replace(tzinfo=timezone.utc)
-                else:
-                    dt = dt.astimezone(timezone.utc)
+                dt = datetime.fromisoformat(published.replace("Z","")).replace(tzinfo=timezone.utc)
             except:
-                dt = now
-            records.append({
-                "title": art.get("title",""),
-                "link": art.get("url",""),
-                "pubDate": dt,
-                "image": "",
-                "source": art.get("source",{}).get("name","")
-            })
+                dt = None
+            if dt and dt >= cutoff:  # include only last 24h
+                records.append({
+                    "title": art.get("title",""),
+                    "link": art.get("url",""),
+                    "pubDate": dt,
+                    "image": "",
+                    "source": art.get("source",{}).get("name","")
+                })
         return pd.DataFrame(records)
     except:
         return pd.DataFrame()
@@ -156,20 +143,16 @@ def fetch_newsapi():
 def preprocess(df):
     if df.empty:
         return df
-
     df["datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
     df = df.dropna(subset=["datetime"])
     if df.empty:
         return df
-
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
-
     df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
     df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
     df["dow_sin"] = np.sin(2 * np.pi * df["dow"] / 7)
     df["dow_cos"] = np.cos(2 * np.pi * df["dow"] / 7)
-
     df["Content"] = df["title"].astype(str)
     return df
 
@@ -201,7 +184,6 @@ if not all_news.empty:
     X = np.hstack([X_emb, X_time])
     all_news["SectorID"] = classifier.predict(X)
     all_news["Sector"] = all_news["SectorID"].map(sector_map)
-
     all_news["Economy_Score"] = all_news["Content"].apply(lambda x: calc_score(x, economy_kw))
     all_news["Weather_Score"] = all_news["Content"].apply(lambda x: calc_score(x, weather_kw))
     all_news["Social_Score"] = all_news["Content"].apply(lambda x: calc_score(x, social_kw))
@@ -210,10 +192,11 @@ if not all_news.empty:
     all_news["Insight"] = all_news.apply(generate_insight, axis=1)
 
 # -----------------------------
-# Filter news for summaries
+# Function to filter recent news
 # -----------------------------
 def filter_recent(df, hours):
-    if df.empty: return df
+    if df.empty:
+        return df
     now = datetime.now(timezone.utc)
     cutoff = now - pd.Timedelta(hours=hours)
     return df[df["datetime"] >= cutoff]
@@ -225,68 +208,45 @@ if page == "Home":
 
     st.image("photo.png", width=800)
     st.title("📰 Sri Lanka News Intelligence Dashboard")
+    st.write("Welcome to the automated **real-time news intelligence system** for Sri Lanka.")
 
-    st.write("""
-    Welcome to the automated **real-time news intelligence system** for Sri Lanka.
-    This dashboard fetches, classifies, scores, and analyzes news in multiple sectors.
-    """)
+    st.subheader("Quick Summary")
 
-    st.subheader("How the System Works")
-    st.markdown("""
-    - Fetches **real-time news** from RSS + NewsAPI  
-    - Cleans and normalizes article content  
-    - Converts text into **MiniLM embeddings**  
-    - Classifies articles into **12 sectors** using ML  
-    - Detects **risk signals** (Economy, Weather, Social, Logistics, Tourism)  
-    - Generates insights and visual summaries  
-    """)
+    last_24h = all_news.copy()  # RSS all news + NewsAPI last 24h
+    last_3h = filter_recent(all_news, hours=3)
 
-    st.info(f"Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
+    # Safe metric calculation
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Total Articles", len(last_24h))
+    col2.metric("Sectors Detected", last_24h.get("Sector", pd.Series()).nunique())
+    col3.metric("Risk Alerts", (last_24h.get("Insight", pd.Series()) != "Normal").sum())
 
-    if not all_news.empty:
-        st.subheader("Quick Summary")
-
-        last_24h = pd.concat([new_rss, new_api], ignore_index=True)
-        last_3h = filter_recent(all_news, hours=3)
-
-        st.markdown("**Last 24 Hours**")
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Total Articles", len(last_24h))
-        col2.metric("Sectors Detected", last_24h["Content"].apply(lambda x: 1).nunique())  # placeholder
-        col3.metric("Risk Alerts", len(last_24h))  # placeholder, ML scoring can be added
-
-        st.markdown("**Last 3 Hours**")
-        col4, col5, col6 = st.columns(3)
-        col4.metric("Total Articles", len(last_3h))
-        col5.metric("Sectors Detected", last_3h["Sector"].nunique())
-        col6.metric("Risk Alerts", (last_3h["Insight"] != "Normal").sum())
+    st.markdown("**Last 3 Hours**")
+    col4, col5, col6 = st.columns(3)
+    col4.metric("Total Articles", len(last_3h))
+    col5.metric("Sectors Detected", last_3h.get("Sector", pd.Series()).nunique())
+    col6.metric("Risk Alerts", (last_3h.get("Insight", pd.Series()) != "Normal").sum())
 
 # ============================================================
 # PAGE 2 — LATEST NEWS
 # ============================================================
 elif page == "Latest News":
-
     st.title("📰 Latest News")
-
-    time_range = st.radio("Select time range:", ["Last 24 hours", "Last 3 hours"])
-    hours = 24 if time_range == "Last 24 hours" else 3
-    filtered_news = filter_recent(all_news, hours=hours)
-
+    filtered_news = all_news.copy()
     st.dataframe(filtered_news[["datetime","Content","link"]], use_container_width=True)
 
 # ============================================================
 # PAGE 3 — ANALYTICS
 # ============================================================
 elif page == "Analytics":
-
     st.title("📈 Analytics & Visualizations")
-
     st.subheader("Sector Distribution")
     fig1 = px.bar(all_news["Sector"].value_counts(), title="News Count per Sector")
     st.plotly_chart(fig1)
 
     st.subheader("Risk Score Heatmap")
-    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
+    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score",
+                                       "Logistics_Score","Tourism_Score"]].sum()
     fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
     st.plotly_chart(fig2)
 
@@ -294,22 +254,16 @@ elif page == "Analytics":
 # PAGE 4 — RISK SIGNALS
 # ============================================================
 elif page == "Risk Signals":
-
     st.title("⚠️ Risk Signals & Insights")
-
-    time_range = st.radio("Select time range:", ["Last 24 hours", "Last 3 hours"])
-    hours = 24 if time_range == "Last 24 hours" else 3
-    filtered_news = filter_recent(all_news, hours=hours)
-
+    filtered_news = all_news.copy()
     heat = filtered_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score",
                                             "Logistics_Score","Tourism_Score"]].sum()
-
     col1, col2, col3, col4, col5 = st.columns(5)
-    col1.metric("Economy Alerts", heat["Economy_Score"].sum())
-    col2.metric("Weather Alerts", heat["Weather_Score"].sum())
-    col3.metric("Social Alerts", heat["Social_Score"].sum())
-    col4.metric("Logistics Alerts", heat["Logistics_Score"].sum())
-    col5.metric("Tourism Signals", heat["Tourism_Score"].sum())
+    col1.metric("Economy Alerts", heat["Economy_Score"].sum() if "Economy_Score" in heat else 0)
+    col2.metric("Weather Alerts", heat["Weather_Score"].sum() if "Weather_Score" in heat else 0)
+    col3.metric("Social Alerts", heat["Social_Score"].sum() if "Social_Score" in heat else 0)
+    col4.metric("Logistics Alerts", heat["Logistics_Score"].sum() if "Logistics_Score" in heat else 0)
+    col5.metric("Tourism Signals", heat["Tourism_Score"].sum() if "Tourism_Score" in heat else 0)
 
     st.subheader("Top Insights")
     st.dataframe(filtered_news[["Content","Sector","Insight"]])
