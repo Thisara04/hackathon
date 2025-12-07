@@ -10,3 +10,4 @@ scikit-learn
 plotly
 lxml
 catboost
+streamlit-autorefresh
