@@ -23,13 +23,13 @@ page = st.sidebar.radio(
 )
 
 # -----------------------------
-# UPDATE BUTTON (ADDED HERE)
+# UPDATE BUTTON
 # -----------------------------
 if st.sidebar.button("🔄 Update Now"):
     st.cache_data.clear()
     st.cache_resource.clear()
-    st.rerun()
-    
+    st.experimental_rerun()  # New method for Streamlit >= 1.18
+
 # -----------------------------
 # Load Models
 # -----------------------------
@@ -188,6 +188,15 @@ if not all_news.empty:
     all_news["Tourism_Score"] = all_news["Content"].apply(lambda x: calc_score(x, tourism_kw))
     all_news["Insight"] = all_news.apply(generate_insight, axis=1)
 
+# -----------------------------
+# Function to filter recent news
+# -----------------------------
+def filter_recent(df, hours=12):
+    if df.empty: return df
+    now = datetime.now()
+    cutoff = now - pd.Timedelta(hours=hours)
+    return df[df["datetime"] >= cutoff]
+
 # ============================================================
 # PAGE 1 — HOME
 # ============================================================
@@ -227,7 +236,13 @@ if page == "Home":
 elif page == "Latest News":
 
     st.title("📰 Latest News")
-    st.dataframe(all_news[["datetime","Content","link"]], use_container_width=True)
+
+    # Time filter
+    time_range = st.radio("Select time range:", ["Last 12 hours", "Last 4 hours"])
+    hours = 12 if time_range == "Last 12 hours" else 4
+    filtered_news = filter_recent(all_news, hours=hours)
+
+    st.dataframe(filtered_news[["datetime","Content","link"]], use_container_width=True)
 
 # ============================================================
 # PAGE 3 — ANALYTICS
@@ -252,7 +267,13 @@ elif page == "Risk Signals":
 
     st.title("⚠️ Risk Signals & Insights")
 
-    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
+    # Time filter
+    time_range = st.radio("Select time range:", ["Last 12 hours", "Last 4 hours"])
+    hours = 12 if time_range == "Last 12 hours" else 4
+    filtered_news = filter_recent(all_news, hours=hours)
+
+    heat = filtered_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score",
+                                            "Logistics_Score","Tourism_Score"]].sum()
 
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Economy Alerts", heat["Economy_Score"].sum())
@@ -262,11 +283,11 @@ elif page == "Risk Signals":
     col5.metric("Tourism Signals", heat["Tourism_Score"].sum())
 
     st.subheader("Top Insights")
-    st.dataframe(all_news[["Content","Sector","Insight"]])
+    st.dataframe(filtered_news[["Content","Sector","Insight"]])
 
     st.download_button(
         label="Download Output CSV",
-        data=all_news.to_csv(index=False),
+        data=filtered_news.to_csv(index=False),
         file_name="signals_output.csv",
         mime="text/csv"
     )
