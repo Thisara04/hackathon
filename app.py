@@ -140,20 +140,34 @@ def fetch_newsapi():
 # Preprocess
 # -----------------------------
 def preprocess(df):
-    if df.empty: return df
+    if df.empty:
+        return df
+    
+    # Ensure proper datetime parsing
     def parse_date(x):
-        try: return pd.to_datetime(x)
-        except: return None
+        try:
+            return pd.to_datetime(x, errors='coerce')  # coerce invalids to NaT
+        except:
+            return pd.NaT
+    
     df["datetime"] = df["pubDate"].apply(parse_date)
+    
+    # Drop rows where datetime could not be parsed
     df = df.dropna(subset=["datetime"])
+    
+    # Now safe to use .dt
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
     df["month_sin"] = np.sin(2*np.pi*df["month"]/12)
     df["month_cos"] = np.cos(2*np.pi*df["month"]/12)
     df["dow_sin"] = np.sin(2*np.pi*df["dow"]/7)
     df["dow_cos"] = np.cos(2*np.pi*df["dow"]/7)
-    df["Content"] = df["title"]
+    
+    # Use title as content
+    df["Content"] = df["title"].astype(str)
+    
     return df
+
 
 # -----------------------------
 # Load Existing Data
