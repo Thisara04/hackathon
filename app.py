@@ -185,7 +185,7 @@ if not all_news.empty:
 # ============================================================
 if page == "Home":
 
-    st.image("photo.png", width=800,height=400)  # ← resized photo
+    st.image("photo.png", width=800)  # ← resized photo
 
     st.title("📰 Sri Lanka News Intelligence Dashboard")
 
