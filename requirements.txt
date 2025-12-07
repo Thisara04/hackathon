@@ -13,3 +13,4 @@ catboost
 streamlit-autorefresh
 wordcloud
 matplotlib
+tweepy
