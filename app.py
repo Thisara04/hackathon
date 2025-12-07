@@ -142,38 +142,31 @@ def fetch_newsapi():
 def preprocess(df):
     if df.empty:
         return df
-    
-    # Convert to datetime safely
-    def parse_date(x):
-        if pd.isna(x):
-            return pd.NaT
-        if isinstance(x, datetime):
-            return x
-        try:
-            # Try parsing ISO format first
-            return pd.to_datetime(x, errors='coerce')
-        except:
-            return pd.NaT
-    
-    df["datetime"] = df["pubDate"].apply(parse_date)
+
+    # Convert all types to pandas datetime safely
+    df["datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
     
     # Drop rows where datetime could not be parsed
     df = df.dropna(subset=["datetime"])
-    
+
     if df.empty:
         return df
-    
-    # Safe to use .dt accessor now
+
+    # Extract month/day-of-week safely
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
-    df["month_sin"] = np.sin(2*np.pi*df["month"]/12)
-    df["month_cos"] = np.cos(2*np.pi*df["month"]/12)
-    df["dow_sin"] = np.sin(2*np.pi*df["dow"]/7)
-    df["dow_cos"] = np.cos(2*np.pi*df["dow"]/7)
-    
+
+    # Encode cyclical features
+    df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
+    df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
+    df["dow_sin"] = np.sin(2 * np.pi * df["dow"] / 7)
+    df["dow_cos"] = np.cos(2 * np.pi * df["dow"] / 7)
+
+    # Ensure content column
     df["Content"] = df["title"].astype(str)
-    
+
     return df
+
 
 
 
