@@ -70,6 +70,10 @@ def generate_insight(r):
     if r.get("Tourism_Score",0) >= 1: insights.append("Tourism opportunity")
     return "; ".join(insights) if insights else "Normal"
 
+# Auto-refresh every 10 minutes (600,000 ms)
+st_autorefresh(interval=10 * 60 * 1000, key="auto_refresh")
+
+
 # -----------------------------
 # RSS Feeds
 # -----------------------------
