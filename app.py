@@ -78,7 +78,7 @@ st_autorefresh(interval=10 * 60 * 1000, key="auto_refresh")
 # RSS Feeds
 # -----------------------------
 RSS_FEEDS = [
-    "https://www.dailymirror.lk/RSS_Feeds/breaking_news",
+    "https://www.dailymirror.lk/RSS_Feeds/breaking_news/108",
     "https://www.dailymirror.lk/rss/business_24_7/395",
     "https://www.dailymirror.lk/rss/top_story/155",
     "https://economynext.com/feed/",
