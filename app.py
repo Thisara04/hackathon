@@ -349,7 +349,8 @@ elif page == "Analytics":
         width=1600,
         height=800,
         background_color="white",
-        collocations=False
+        collocations=False,
+        max_words=20
     ).generate(text_blob)
 
     fig_wc = plt.figure(figsize=(12,6))
