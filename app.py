@@ -15,11 +15,12 @@ import plotly.express as px
 st.set_page_config(page_title="News Intelligence Dashboard", layout="wide")
 
 # -----------------------------
-# Cover Photo
+# Sidebar Navigation
 # -----------------------------
-st.image("photo.png", use_container_width=True)
-
-st.title("📰 Sri Lanka News Intelligence Dashboard (Phase 3–5)")
+page = st.sidebar.radio(
+    "Navigation",
+    ["Home", "Latest News", "Analytics", "Risk Signals"]
+)
 
 # -----------------------------
 # Load Models
@@ -161,11 +162,8 @@ all_news = preprocess(all_news)
 # Save cache
 all_news.to_csv("news_cache.csv", index=False)
 
-st.subheader("Latest News")
-st.dataframe(all_news[["datetime","Content","link"]], use_container_width=True)
-
 # -----------------------------
-# Prediction
+# Apply ML Predictions & Scoring
 # -----------------------------
 if not all_news.empty:
     X_text = all_news["Content"].tolist()
@@ -175,9 +173,6 @@ if not all_news.empty:
     all_news["SectorID"] = classifier.predict(X)
     all_news["Sector"] = all_news["SectorID"].map(sector_map)
 
-    # -----------------------------
-    # Risk Signals
-    # -----------------------------
     all_news["Economy_Score"] = all_news["Content"].apply(lambda x: calc_score(x, economy_kw))
     all_news["Weather_Score"] = all_news["Content"].apply(lambda x: calc_score(x, weather_kw))
     all_news["Social_Score"] = all_news["Content"].apply(lambda x: calc_score(x, social_kw))
@@ -185,24 +180,72 @@ if not all_news.empty:
     all_news["Tourism_Score"] = all_news["Content"].apply(lambda x: calc_score(x, tourism_kw))
     all_news["Insight"] = all_news.apply(generate_insight, axis=1)
 
-    # -----------------------------
-    # Visualizations
-    # -----------------------------
-    st.header("📈 Analytics & Visualizations")
+# ============================================================
+# PAGE 1 — HOME
+# ============================================================
+if page == "Home":
 
-    # Sector Distribution
+    st.image("photo.png", width=400)  # ← resized photo
+
+    st.title("📰 Sri Lanka News Intelligence Dashboard")
+
+    st.write("""
+    Welcome to the automated **real-time news intelligence system** for Sri Lanka.
+    This dashboard fetches, classifies, scores, and analyzes news in multiple sectors.
+    """)
+
+    st.subheader("How the System Works")
+    st.markdown("""
+    - Fetches **real-time news** from RSS + NewsAPI  
+    - Cleans and normalizes article content  
+    - Converts text into **MiniLM embeddings**  
+    - Classifies articles into **12 sectors** using ML  
+    - Detects **risk signals** (Economy, Weather, Social, Logistics, Tourism)  
+    - Generates insights and visual summaries  
+    """)
+
+    st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+    if not all_news.empty:
+        st.subheader("Quick Summary")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Total Articles", len(all_news))
+        col2.metric("Sectors Detected", all_news["Sector"].nunique())
+        col3.metric("Risk Alerts", (all_news["Insight"] != "Normal").sum())
+
+# ============================================================
+# PAGE 2 — LATEST NEWS
+# ============================================================
+elif page == "Latest News":
+
+    st.title("📰 Latest News")
+    st.dataframe(all_news[["datetime","Content","link"]], use_container_width=True)
+
+# ============================================================
+# PAGE 3 — ANALYTICS
+# ============================================================
+elif page == "Analytics":
+
+    st.title("📈 Analytics & Visualizations")
+
     st.subheader("Sector Distribution")
     fig1 = px.bar(all_news["Sector"].value_counts(), title="News Count per Sector")
     st.plotly_chart(fig1)
 
-    # Risk Heatmap
     st.subheader("Risk Score Heatmap")
     heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
     fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
     st.plotly_chart(fig2)
 
-    # Risk Summary Metrics
-    st.subheader("Risk Summary")
+# ============================================================
+# PAGE 4 — RISK SIGNALS
+# ============================================================
+elif page == "Risk Signals":
+
+    st.title("⚠️ Risk Signals & Insights")
+
+    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
+
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Economy Alerts", heat["Economy_Score"].sum())
     col2.metric("Weather Alerts", heat["Weather_Score"].sum())
@@ -210,11 +253,9 @@ if not all_news.empty:
     col4.metric("Logistics Alerts", heat["Logistics_Score"].sum())
     col5.metric("Tourism Signals", heat["Tourism_Score"].sum())
 
-    # Top Insights
     st.subheader("Top Insights")
     st.dataframe(all_news[["Content","Sector","Insight"]])
 
-    # Download results
     st.download_button(
         label="Download Output CSV",
         data=all_news.to_csv(index=False),
