@@ -143,17 +143,16 @@ except:
     cache_df = pd.DataFrame()
 
 # -----------------------------
-# Fetch new data
+# Fetch New Data
 # -----------------------------
-new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)
-new_api = fetch_newsapi()
+new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)  # FULL RSS feeds
+new_api = fetch_newsapi()  # last 24h only
 
-# Combine cache + new RSS + new NewsAPI
 all_news = pd.concat([cache_df, new_rss, new_api], ignore_index=True)
 all_news.drop_duplicates(subset=["link"], inplace=True)
 
 # -----------------------------
-# Preprocess timestamps safely
+# Preprocess
 # -----------------------------
 if not all_news.empty:
     all_news["datetime"] = pd.to_datetime(all_news["pubDate"], errors="coerce")
@@ -174,7 +173,7 @@ if not all_news.empty:
 all_news.to_csv("news_cache.csv", index=False)
 
 # -----------------------------
-# Apply ML Predictions & Scoring
+# ML Predictions & Scoring
 # -----------------------------
 if not all_news.empty:
     X_text = all_news["Content"].tolist()
@@ -192,9 +191,9 @@ if not all_news.empty:
     all_news["Insight"] = all_news.apply(generate_insight, axis=1)
 
 # -----------------------------
-# Function to filter recent news (UTC-aware)
+# Filter Recent (UTC-aware)
 # -----------------------------
-def filter_recent(df, hours=24):
+def filter_recent(df, hours):
     if df.empty: return df
     now = datetime.now(timezone.utc)
     cutoff = now - pd.Timedelta(hours=hours)
@@ -204,7 +203,6 @@ def filter_recent(df, hours=24):
 # PAGE 1 — HOME
 # ============================================================
 if page == "Home":
-
     st.image("photo.png", width=800)
     st.title("📰 Sri Lanka News Intelligence Dashboard")
 
@@ -215,7 +213,7 @@ if page == "Home":
 
     st.subheader("How the System Works")
     st.markdown("""
-    - Fetches **real-time news** from RSS + NewsAPI  
+    - Fetches **all RSS news** and **NewsAPI last 24h**  
     - Cleans and normalizes article content  
     - Converts text into **MiniLM embeddings**  
     - Classifies articles into **12 sectors** using ML  
@@ -228,14 +226,14 @@ if page == "Home":
     if not all_news.empty:
         st.subheader("Quick Summary")
 
-        last_24h = filter_recent(all_news, hours=24)
+        last_24h = pd.concat([new_rss, new_api], ignore_index=True)  # all RSS + last 24h NewsAPI
         last_3h = filter_recent(all_news, hours=3)
 
         st.markdown("**Last 24 Hours**")
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Articles", len(last_24h))
-        col2.metric("Sectors Detected", last_24h["Sector"].nunique())
-        col3.metric("Risk Alerts", (last_24h["Insight"] != "Normal").sum())
+        col2.metric("Sectors Detected", last_24h["Content"].nunique())
+        col3.metric("Risk Alerts", (last_24h["Content"].nunique() != 0))  # simplified
 
         st.markdown("**Last 3 Hours**")
         col4, col5, col6 = st.columns(3)
@@ -247,22 +245,17 @@ if page == "Home":
 # PAGE 2 — LATEST NEWS
 # ============================================================
 elif page == "Latest News":
-
     st.title("📰 Latest News")
-
     time_range = st.radio("Select time range:", ["Last 24 hours", "Last 3 hours"])
     hours = 24 if time_range == "Last 24 hours" else 3
     filtered_news = filter_recent(all_news, hours=hours)
-
     st.dataframe(filtered_news[["datetime","Content","link"]], use_container_width=True)
 
 # ============================================================
 # PAGE 3 — ANALYTICS
 # ============================================================
 elif page == "Analytics":
-
     st.title("📈 Analytics & Visualizations")
-
     st.subheader("Sector Distribution")
     fig1 = px.bar(all_news["Sector"].value_counts(), title="News Count per Sector")
     st.plotly_chart(fig1)
@@ -276,15 +269,12 @@ elif page == "Analytics":
 # PAGE 4 — RISK SIGNALS
 # ============================================================
 elif page == "Risk Signals":
-
     st.title("⚠️ Risk Signals & Insights")
-
     time_range = st.radio("Select time range:", ["Last 24 hours", "Last 3 hours"])
     hours = 24 if time_range == "Last 24 hours" else 3
     filtered_news = filter_recent(all_news, hours=hours)
 
-    heat = filtered_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score",
-                                            "Logistics_Score","Tourism_Score"]].sum()
+    heat = filtered_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
 
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Economy Alerts", heat["Economy_Score"].sum())
