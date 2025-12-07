@@ -4,10 +4,11 @@ import numpy as np
 import joblib
 import requests
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 import plotly.express as px
+from dateutil import parser
 
 # -----------------------------
 # Page Config
@@ -102,9 +103,12 @@ def fetch_rss(url):
             enclosure = it.find("enclosure")
             if enclosure and enclosure.get("url"):
                 img = enclosure.get("url")
-            # parse pubDate, fallback to now
             try:
-                dt = datetime.strptime(pub, "%a, %d %b %Y %H:%M:%S %Z").replace(tzinfo=timezone.utc)
+                dt = parser.parse(pub)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                else:
+                    dt = dt.astimezone(timezone.utc)
             except:
                 dt = now
             records.append({"title": title, "link": link, "pubDate": dt, "image": img})
@@ -113,15 +117,14 @@ def fetch_rss(url):
         return pd.DataFrame()
 
 # -----------------------------
-# NewsAPI Fetching (last 24 hours only)
+# NewsAPI Fetching (last 24 hours)
 # -----------------------------
 NEWSAPI_KEY = "681548c940d14836b6edbb62b1d39442"
 
 def fetch_newsapi():
     now = datetime.now(timezone.utc)
-    from_dt = now - timedelta(hours=24)
-    from_iso = from_dt.isoformat()
-    url = f"https://newsapi.org/v2/everything?q=sri+lanka&from={from_iso}&sortBy=publishedAt&apiKey={NEWSAPI_KEY}"
+    from_dt = (now - pd.Timedelta(hours=24)).isoformat()
+    url = f"https://newsapi.org/v2/everything?q=sri+lanka&from={from_dt}&sortBy=publishedAt&apiKey={NEWSAPI_KEY}"
     try:
         resp = requests.get(url).json()
         articles = resp.get("articles", [])
@@ -129,7 +132,11 @@ def fetch_newsapi():
         for art in articles:
             published = art.get("publishedAt","")
             try:
-                dt = datetime.fromisoformat(published.replace("Z","")).replace(tzinfo=timezone.utc)
+                dt = parser.parse(published)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                else:
+                    dt = dt.astimezone(timezone.utc)
             except:
                 dt = now
             records.append({
@@ -203,12 +210,12 @@ if not all_news.empty:
     all_news["Insight"] = all_news.apply(generate_insight, axis=1)
 
 # -----------------------------
-# Function to filter recent news (UTC-aware)
+# Filter news for summaries
 # -----------------------------
-def filter_recent(df, hours=24):
+def filter_recent(df, hours):
     if df.empty: return df
     now = datetime.now(timezone.utc)
-    cutoff = now - timedelta(hours=hours)
+    cutoff = now - pd.Timedelta(hours=hours)
     return df[df["datetime"] >= cutoff]
 
 # ============================================================
@@ -240,15 +247,13 @@ if page == "Home":
         st.subheader("Quick Summary")
 
         last_24h = pd.concat([new_rss, new_api], ignore_index=True)
-        last_24h = preprocess(last_24h)
-
         last_3h = filter_recent(all_news, hours=3)
 
         st.markdown("**Last 24 Hours**")
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Articles", len(last_24h))
-        col2.metric("Sectors Detected", last_24h["Content"].nunique())  # placeholder
-        col3.metric("Risk Alerts", (last_24h.get("Insight","Normal") != "Normal").sum())
+        col2.metric("Sectors Detected", last_24h["Content"].apply(lambda x: 1).nunique())  # placeholder
+        col3.metric("Risk Alerts", len(last_24h))  # placeholder, ML scoring can be added
 
         st.markdown("**Last 3 Hours**")
         col4, col5, col6 = st.columns(3)
