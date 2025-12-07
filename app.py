@@ -28,7 +28,7 @@ page = st.sidebar.radio(
 if st.sidebar.button("🔄 Update Now"):
     st.cache_data.clear()
     st.cache_resource.clear()
-    st.experimental_rerun()  # New method for Streamlit >= 1.18
+    st.experimental_rerun()  # Streamlit >=1.18
 
 # -----------------------------
 # Load Models
@@ -69,12 +69,17 @@ def generate_insight(r):
     return "; ".join(insights) if insights else "Normal"
 
 # -----------------------------
-# RSS Fetching
+# RSS Feeds
 # -----------------------------
 RSS_FEEDS = [
+    # Original three
     "https://www.dailymirror.lk/RSS_Feeds/breaking_news",
     "https://www.dailymirror.lk/rss/business_24_7/395",
-    "https://www.dailymirror.lk/rss/top_story/155"
+    "https://www.dailymirror.lk/rss/top_story/155",
+    # New three
+    "https://economynext.com/feed/",
+    "https://www.news.lk/news?format=feed",
+    "https://www.onlanka.com/feed"
 ]
 
 def clean_rss_xml(text):
@@ -202,8 +207,7 @@ def filter_recent(df, hours=12):
 # ============================================================
 if page == "Home":
 
-    st.image("photo.png", width=800)  # ← resized photo
-
+    st.image("photo.png", width=800)
     st.title("📰 Sri Lanka News Intelligence Dashboard")
 
     st.write("""
@@ -267,8 +271,7 @@ elif page == "Analytics":
     st.plotly_chart(fig1)
 
     st.subheader("Risk Score Heatmap")
-    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score",
-                                       "Logistics_Score","Tourism_Score"]].sum()
+    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]].sum()
     fig2 = px.imshow(heat, text_auto=True, title="Risk Heatmap by Sector")
     st.plotly_chart(fig2)
 
