@@ -77,10 +77,10 @@ st_autorefresh(interval=10 * 60 * 1000, key="auto_refresh")
 #  TWITTER API (safe mode – if rate limited → return empty dataframe)
 # ===================================================================
 
-TW_API_KEY = "YOUR_TWITTER_KEY"
-TW_API_SECRET = "YOUR_TWITTER_SECRET"
-TW_ACCESS_TOKEN = "YOUR_TWITTER_ACCESS"
-TW_ACCESS_SECRET = "YOUR_TWITTER_ACCESS_SECRET"
+TW_API_KEY = "PjdzqbxWlC5gJXtP4rHEmZ2wN"
+TW_API_SECRET = "68XS5Q1BLd7Ne23ssgCqHWhursP2ggslnpT3j3mmo5cTyGxkA2"
+TW_ACCESS_TOKEN = "1904574098656608256-cmV7U7e8B5VmJjbQ6DRXoMEE5uTPwJ"
+TW_ACCESS_SECRET = "HOViVM12Ogm5k47tJ0sOPzuvHPkUPTlBKWb1rtFcCUiK4"
 
 def fetch_twitter():
     try:
