@@ -226,16 +226,16 @@ if page == "Home":
     if not all_news.empty:
         st.subheader("Quick Summary")
 
-        # Filter news for last 12 hours and 4 hours
+        # Filter news for last 24 hours and 4 hours
         now = datetime.now()
-        last_12h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=12)]
+        last_24h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=24)]
         last_4h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=4)]
 
-        st.markdown("**Last 12 Hours**")
+        st.markdown("**Last 24 Hours**")
         col1, col2, col3 = st.columns(3)
-        col1.metric("Total Articles", len(last_12h))
-        col2.metric("Sectors Detected", last_12h["Sector"].nunique())
-        col3.metric("Risk Alerts", (last_12h["Insight"] != "Normal").sum())
+        col1.metric("Total Articles", len(last_24h))
+        col2.metric("Sectors Detected", last_24h["Sector"].nunique())
+        col3.metric("Risk Alerts", (last_24h["Insight"] != "Normal").sum())
 
         st.markdown("**Last 4 Hours**")
         col4, col5, col6 = st.columns(3)
