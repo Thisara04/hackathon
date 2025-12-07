@@ -23,6 +23,14 @@ page = st.sidebar.radio(
 )
 
 # -----------------------------
+# UPDATE BUTTON (ADDED HERE)
+# -----------------------------
+if st.sidebar.button("🔄 Update Now"):
+    st.cache_data.clear()
+    st.cache_resource.clear()
+    st.experimental_rerun()
+    
+# -----------------------------
 # Load Models
 # -----------------------------
 @st.cache_resource
