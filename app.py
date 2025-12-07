@@ -13,6 +13,12 @@ import plotly.express as px
 # Page Config
 # -----------------------------
 st.set_page_config(page_title="News Intelligence Dashboard", layout="wide")
+
+# -----------------------------
+# Cover Photo
+# -----------------------------
+st.image("photo.png", use_container_width=True)
+
 st.title("📰 Sri Lanka News Intelligence Dashboard (Phase 3–5)")
 
 # -----------------------------
