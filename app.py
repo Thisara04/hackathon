@@ -231,7 +231,7 @@ if page == "Home":
         last_12h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=24)]
         last_4h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=4)]
 
-        st.markdown("**Last 24 Hours**")
+        st.markdown("**Last 12 Hours**")
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Articles", len(last_12h))
         col2.metric("Sectors Detected", last_12h["Sector"].nunique())
