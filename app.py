@@ -143,10 +143,15 @@ def preprocess(df):
     if df.empty:
         return df
     
-    # Ensure proper datetime parsing
+    # Convert to datetime safely
     def parse_date(x):
+        if pd.isna(x):
+            return pd.NaT
+        if isinstance(x, datetime):
+            return x
         try:
-            return pd.to_datetime(x, errors='coerce')  # coerce invalids to NaT
+            # Try parsing ISO format first
+            return pd.to_datetime(x, errors='coerce')
         except:
             return pd.NaT
     
@@ -155,7 +160,10 @@ def preprocess(df):
     # Drop rows where datetime could not be parsed
     df = df.dropna(subset=["datetime"])
     
-    # Now safe to use .dt
+    if df.empty:
+        return df
+    
+    # Safe to use .dt accessor now
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
     df["month_sin"] = np.sin(2*np.pi*df["month"]/12)
@@ -163,10 +171,10 @@ def preprocess(df):
     df["dow_sin"] = np.sin(2*np.pi*df["dow"]/7)
     df["dow_cos"] = np.cos(2*np.pi*df["dow"]/7)
     
-    # Use title as content
     df["Content"] = df["title"].astype(str)
     
     return df
+
 
 
 # -----------------------------
