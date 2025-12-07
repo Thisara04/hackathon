@@ -4,7 +4,7 @@ import numpy as np
 import joblib
 import requests
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 import plotly.express as px
@@ -72,11 +72,9 @@ def generate_insight(r):
 # RSS Feeds
 # -----------------------------
 RSS_FEEDS = [
-    # Original three
     "https://www.dailymirror.lk/RSS_Feeds/breaking_news",
     "https://www.dailymirror.lk/rss/business_24_7/395",
     "https://www.dailymirror.lk/rss/top_story/155",
-    # New three
     "https://economynext.com/feed/",
     "https://www.news.lk/news?format=feed",
     "https://www.onlanka.com/feed"
@@ -122,7 +120,7 @@ def fetch_newsapi():
         for art in articles:
             published = art.get("publishedAt","")
             try:
-                dt = datetime.fromisoformat(published.replace("Z",""))
+                dt = datetime.fromisoformat(published.replace("Z","")).replace(tzinfo=timezone.utc)
             except:
                 dt = None
             records.append({
@@ -143,32 +141,21 @@ def preprocess(df):
     if df.empty:
         return df
 
-    # Convert all types to pandas datetime safely
     df["datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
-    
-    # Drop rows where datetime could not be parsed
     df = df.dropna(subset=["datetime"])
-
     if df.empty:
         return df
 
-    # Extract month/day-of-week safely
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
 
-    # Encode cyclical features
     df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
     df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
     df["dow_sin"] = np.sin(2 * np.pi * df["dow"] / 7)
     df["dow_cos"] = np.cos(2 * np.pi * df["dow"] / 7)
 
-    # Ensure content column
     df["Content"] = df["title"].astype(str)
-
     return df
-
-
-
 
 # -----------------------------
 # Load Existing Data
@@ -186,8 +173,6 @@ new_api = fetch_newsapi()
 all_news = pd.concat([cache_df, new_rss, new_api], ignore_index=True)
 all_news.drop_duplicates(subset=["link"], inplace=True)
 all_news = preprocess(all_news)
-
-# Save cache
 all_news.to_csv("news_cache.csv", index=False)
 
 # -----------------------------
@@ -209,11 +194,11 @@ if not all_news.empty:
     all_news["Insight"] = all_news.apply(generate_insight, axis=1)
 
 # -----------------------------
-# Function to filter recent news
+# Function to filter recent news (UTC-aware)
 # -----------------------------
 def filter_recent(df, hours=12):
     if df.empty: return df
-    now = datetime.now()
+    now = datetime.now(timezone.utc)
     cutoff = now - pd.Timedelta(hours=hours)
     return df[df["datetime"] >= cutoff]
 
@@ -240,12 +225,12 @@ if page == "Home":
     - Generates insights and visual summaries  
     """)
 
-    st.info(f"Last updated: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    st.info(f"Last updated: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
 
     if not all_news.empty:
         st.subheader("Quick Summary")
 
-        now = datetime.now()
+        now = datetime.now(timezone.utc)
         last_12h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=12)]
         last_4h = all_news[all_news["datetime"] >= now - pd.Timedelta(hours=4)]
 
