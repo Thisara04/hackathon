@@ -220,6 +220,13 @@ new_newsapi = fetch_newsapi()
 new_twitter = fetch_twitter()
 
 all_news = pd.concat([cache_df, new_rss, new_newsapi, new_twitter], ignore_index=True)
+
+# Fill missing sources with "SRSS"
+if "source" not in all_news.columns:
+    all_news["source"] = "RSS"
+else:
+    all_news["source"] = all_news["source"].fillna("SRSS")
+
 all_news.drop_duplicates(subset=["link"], inplace=True)
 all_news = preprocess(all_news)
 all_news.to_csv("news_cache.csv", index=False)
