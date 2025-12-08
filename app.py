@@ -461,7 +461,6 @@ elif page == "Risk Signals":
 
         # Highlight rows with risk
         def highlight_risk(row):
-            color = '#ffcccc'  # light red
             return ['background-color: {}'.format(color) if row["Total_Risk"] > 0 else '' for _ in row]
 
         # Keep only display columns
@@ -469,7 +468,6 @@ elif page == "Risk Signals":
 
         # Use Total_Risk from risky_news for styling
         def highlight_risk(row):
-            color = '#ffcccc'
             # Get corresponding Total_Risk value from risky_news
             tr = risky_news.loc[row.name, "Total_Risk"]
             return ['background-color: {}'.format(color) if tr > 0 else '' for _ in row]
