@@ -130,7 +130,30 @@ def fetch_twitter(days_back=7):
     except Exception as e:
         print("Twitter fetch error:", e)
         return pd.DataFrame()
+        
+#econ data feed
+def fetch_exchange_rates():
+    '''
+    Fetch real-time exchange rates for LKR → USD, GBP, and INR
+    using the free ExchangeRate.host API.
+    '''
+    try:
+        url = "https://api.exchangerate.host/latest?base=LKR&symbols=USD,GBP,INR"
+        resp = requests.get(url).json()
 
+        rates = resp.get("rates", {})
+        if not rates:
+            return {}
+
+        return {
+            "LKR_to_USD": rates.get("USD"),
+            "LKR_to_GBP": rates.get("GBP"),
+            "LKR_to_INR": rates.get("INR"),
+            "timestamp": resp.get("date")
+        }
+    except Exception as e:
+        print("Exchange rate fetch error:", e)
+        return {}
 
 
 # -----------------------------
@@ -254,7 +277,6 @@ except:
 # -----------------------------
 # Fetch new data
 # -----------------------------
-# --- Fetch new data ---
 new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)
 if len(new_rss) > 0:
     new_rss["source"] = "RSS"
@@ -271,44 +293,28 @@ new_gdelt = fetch_gdelt()
 if len(new_gdelt) > 0:
     new_gdelt["source"] = "GDELT"
 
-# --- Merge all sources with old cache ---
-all_news = pd.concat([cache_df, new_rss, new_newsapi, new_twitter, new_gdelt], ignore_index=True)
+# -----------------------------
+# Merge all with cache
+# -----------------------------
+all_news = pd.concat(
+    [cache_df, new_rss, new_newsapi, new_twitter, new_gdelt],
+    ignore_index=True
+)
 
-# --- Fill missing sources ---
+# Ensure source column exists & fill missing
 if "source" not in all_news.columns:
     all_news["source"] = "SRSS"
 else:
     all_news["source"] = all_news["source"].fillna("SRSS")
 
-# --- Remove duplicates ---
+# Remove duplicates using link
 all_news.drop_duplicates(subset=["link"], inplace=True)
 
-# --- Preprocess ---
+# Preprocess the cleaned data
 all_news = preprocess(all_news)
 
-# --- Save cache ---
+# Save cache
 all_news.to_csv("news_cache.csv", index=False)
-
-
-# --- Merge all sources with old cache ---
-all_news = pd.concat([cache_df, new_rss, new_newsapi, new_twitter], ignore_index=True)
-
-# --- Ensure source column exists ---
-if "source" not in all_news.columns:
-    all_news["source"] = "SRSS"
-else:
-    # Fill missing ONLY (do not overwrite existing)
-    all_news["source"] = all_news["source"].fillna("SRSS")
-
-# --- Remove duplicates by link ---
-all_news.drop_duplicates(subset=["link"], inplace=True)
-
-# --- Preprocess the cleaned data ---
-all_news = preprocess(all_news)
-
-# --- Save cache ---
-all_news.to_csv("news_cache.csv", index=False)
-
 
 # -----------------------------
 # ML Prediction & Scoring
