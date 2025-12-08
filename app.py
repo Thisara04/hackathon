@@ -459,7 +459,8 @@ elif page == "Risk Signals":
             color = '#ffcccc'  # light red
             return ['background-color: {}'.format(color) if row["Total_Risk"] > 0 else '' for _ in row]
 
-        st.dataframe(display_df.style.apply(highlight_risk, axis=1).hide_columns(["Total_Risk"]), height=500)
+        st.dataframe(display_df.style.apply(highlight_risk, axis=1).hide_columns(["Total_Risk"]),height=500)
+
 
         # Download button
         st.download_button(
