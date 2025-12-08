@@ -444,7 +444,7 @@ elif page == "Risk Signals":
     risky_news = all_news[all_news["Insight"] != "Normal"].copy()
 
     if not risky_news.empty:
-        # Compute total risk for sorting and highlighting
+        # Compute total risk for sorting
         risky_news["Total_Risk"] = (
             risky_news["Economy_Score"] +
             risky_news["Weather_Score"] +
@@ -456,24 +456,9 @@ elif page == "Risk Signals":
         # Sort by severity
         risky_news = risky_news.sort_values(by="Total_Risk", ascending=False)
 
-        # Prepare dataframe for display (include Total_Risk for styling)
-        display_df = risky_news[["datetime", "Content", "Sector", "Insight", "source", "link", "Total_Risk"]]
-
-        # Highlight rows with risk
-        def highlight_risk(row):
-            return ['background-color: {}'.format(color) if row["Total_Risk"] > 0 else '' for _ in row]
-
-        # Keep only display columns
+        # Display table without color
         display_df = risky_news[["datetime", "Content", "Sector", "Insight", "source", "link"]].copy()
-
-        # Use Total_Risk from risky_news for styling
-        def highlight_risk(row):
-            # Get corresponding Total_Risk value from risky_news
-            tr = risky_news.loc[row.name, "Total_Risk"]
-            return ['background-color: {}'.format(color) if tr > 0 else '' for _ in row]
-
-        st.dataframe(display_df.style.apply(highlight_risk, axis=1), height=500)
-
+        st.dataframe(display_df, height=500)
 
         # Download button
         st.download_button(
@@ -484,4 +469,5 @@ elif page == "Risk Signals":
         )
     else:
         st.info("No risky articles detected in the selected time frame.")
+
 
