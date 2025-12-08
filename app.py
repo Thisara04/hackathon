@@ -459,17 +459,18 @@ elif page == "Risk Signals":
             color = '#ffcccc'  # light red
             return ['background-color: {}'.format(color) if row["Total_Risk"] > 0 else '' for _ in row]
 
-        # Copy only the columns you want to display
+        # Keep only display columns
         display_df = risky_news[["datetime", "Content", "Sector", "Insight", "source", "link"]].copy()
 
-        # Highlight dangerous rows
+        # Use Total_Risk from risky_news for styling
         def highlight_risk(row):
-            color = '#ffcccc'  # light red for risky
-            return ['background-color: {}'.format(color) if row["Total_Risk"] > 0 else '' for _ in row]
+            color = '#ffcccc'
+            # Get corresponding Total_Risk value from risky_news
+            tr = risky_news.loc[row.name, "Total_Risk"]
+            return ['background-color: {}'.format(color) if tr > 0 else '' for _ in row]
 
-        st.dataframe(
-            display_df.style.apply(highlight_risk, axis=1),
-            height=500)
+        st.dataframe(display_df.style.apply(highlight_risk, axis=1), height=500)
+
 
         # Download button
         st.download_button(
