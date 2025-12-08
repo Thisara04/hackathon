@@ -217,7 +217,7 @@ except:
 # -----------------------------
 new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)
 new_newsapi = fetch_newsapi()
-new_twitter = fetch_twitter()  # NEW
+new_twitter = fetch_twitter()
 
 all_news = pd.concat([cache_df, new_rss, new_newsapi, new_twitter], ignore_index=True)
 all_news.drop_duplicates(subset=["link"], inplace=True)
@@ -288,11 +288,7 @@ elif page == "Latest News":
 elif page == "Analytics":
     st.title("📈 Analytics & Visualizations")
 
-    # ---------------------------------------
-    # 1. TIMELINE CHART (Daily Article Count)
-    # ---------------------------------------
     st.subheader("🕒 Timeline of News Volume (Last 7 Days)")
-
     timeline_df = all_news.copy()
     timeline_df["date"] = timeline_df["datetime"].dt.date
     timeline_count = timeline_df.groupby("date").size().reset_index(name="count")
@@ -306,11 +302,7 @@ elif page == "Analytics":
     )
     st.plotly_chart(fig_timeline, use_container_width=True)
 
-    # ---------------------------------------
-    # 2. PIE CHART (Sector Distribution)
-    # ---------------------------------------
     st.subheader("📊 Sector Distribution")
-
     sector_counts = all_news["Sector"].value_counts()
     fig_pie = px.pie(
         values=sector_counts.values,
@@ -320,16 +312,10 @@ elif page == "Analytics":
     )
     st.plotly_chart(fig_pie, use_container_width=True)
 
-    # ---------------------------------------
-    # 3. RISK TREND HEATMAP
-    # ---------------------------------------
     st.subheader("🔥 Risk Trend Heatmap")
-
-    heat = all_news.groupby("Sector")[[
-        "Economy_Score","Weather_Score",
-        "Social_Score","Logistics_Score",
-        "Tourism_Score"
-    ]].sum()
+    heat = all_news.groupby("Sector")[
+        ["Economy_Score","Weather_Score","Social_Score","Logistics_Score","Tourism_Score"]
+    ].sum()
 
     fig_heat = px.imshow(
         heat,
@@ -338,11 +324,7 @@ elif page == "Analytics":
     )
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    # ---------------------------------------
-    # 4. WORD CLOUD
-    # ---------------------------------------
     st.subheader("☁️ Frequent Keywords (Word Cloud)")
-
     text_blob = " ".join(all_news["Content"].astype(str).tolist())
 
     wc = WordCloud(
@@ -356,18 +338,17 @@ elif page == "Analytics":
     fig_wc = plt.figure(figsize=(12,6))
     plt.imshow(wc, interpolation="bilinear")
     plt.axis("off")
-
     st.pyplot(fig_wc)
-
 
 # ============================================================
 # RISK SIGNALS PAGE
 # ============================================================
 elif page == "Risk Signals":
     st.title("⚠️ Risk Signals & Insights")
-    heat = all_news.groupby("Sector")[["Economy_Score","Weather_Score",
-                                       "Social_Score","Logistics_Score",
-                                       "Tourism_Score"]].sum()
+    heat = all_news.groupby("Sector")[[
+        "Economy_Score","Weather_Score","Social_Score",
+        "Logistics_Score","Tourism_Score"
+    ]].sum()
 
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Economy Alerts", heat["Economy_Score"].sum())
