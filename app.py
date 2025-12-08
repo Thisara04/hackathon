@@ -85,32 +85,52 @@ TW_API_SECRET = "68XS5Q1BLd7Ne23ssgCqHWhursP2ggslnpT3j3mmo5cTyGxkA2"
 TW_ACCESS_TOKEN = "1904574098656608256-cmV7U7e8B5VmJjbQ6DRXoMEE5uTPwJ"
 TW_ACCESS_SECRET = "HOViVM12Ogm5k47tJ0sOPzuvHPkUPTlBKWb1rtFcCUiK4"
 
-def fetch_newsapi(days_back=7):
+def fetch_twitter(days_back=7): 
     try:
-        url = f"https://newsapi.org/v2/everything?q=sri+lanka&sortBy=publishedAt&apiKey={NEWSAPI_KEY}"
-        resp = requests.get(url).json()
-        articles = resp.get("articles", [])
+        import requests
+        import pandas as pd
+        from datetime import datetime, timezone
+
+        query = "Sri Lanka -is:retweet lang:en"
+        url = "https://api.twitter.com/2/tweets/search/recent"
+        headers = {"Authorization": f"Bearer {TWITTER_BEARER_TOKEN}"}
+
+        params = {
+            "query": query,
+            "tweet.fields": "created_at,source",
+            "max_results": 100
+        }
+
+        response = requests.get(url, headers=headers, params=params).json()
+        tweets = response.get("data", [])
+
         now = datetime.now(timezone.utc)
         cutoff = now - pd.Timedelta(days=days_back)
+
         records = []
 
-        for art in articles:
-            published = art.get("publishedAt","")
+        for t in tweets:
+            created = t.get("created_at", "")
             try:
-                dt = datetime.fromisoformat(published.replace("Z","")).replace(tzinfo=timezone.utc)
+                dt = datetime.fromisoformat(created.replace("Z", "+00:00"))
             except:
                 dt = None
+
             if dt and dt >= cutoff:
                 records.append({
-                    "title": art.get("title",""),
-                    "link": art.get("url",""),
+                    "title": t.get("text", "")[:120] + "...",
+                    "link": f"https://twitter.com/i/web/status/{t.get('id')}",
                     "pubDate": dt,
                     "image": "",
-                    "source": art.get("source",{}).get("name","")
+                    "source": "Twitter"
                 })
+
         return pd.DataFrame(records)
-    except:
+
+    except Exception as e:
+        print("Twitter fetch error:", e)
         return pd.DataFrame()
+
 
 
 # -----------------------------
