@@ -418,11 +418,14 @@ elif page == "Analytics":
 # ============================================================
 elif page == "Risk Signals":
     st.title("⚠️ Risk Signals & Insights")
+
+    # Calculate heat
     heat = all_news.groupby("Sector")[[
         "Economy_Score","Weather_Score","Social_Score",
         "Logistics_Score","Tourism_Score"
     ]].sum()
 
+    # Display top metrics
     col1, col2, col3, col4, col5 = st.columns(5)
     col1.metric("Economy Alerts", heat["Economy_Score"].sum())
     col2.metric("Weather Alerts", heat["Weather_Score"].sum())
@@ -430,12 +433,35 @@ elif page == "Risk Signals":
     col4.metric("Logistics Alerts", heat["Logistics_Score"].sum())
     col5.metric("Tourism Signals", heat["Tourism_Score"].sum())
 
-    st.subheader("Top Insights")
-    st.dataframe(all_news[["Content","Sector","Insight"]])
+    st.subheader("Top Risk Articles")
 
+    # Filter only risky items
+    risky_news = all_news[all_news["Insight"] != "Normal"].copy()
+
+    # Sort by severity (sum of scores)
+    risky_news["Total_Risk"] = (
+        risky_news["Economy_Score"] +
+        risky_news["Weather_Score"] +
+        risky_news["Social_Score"] +
+        risky_news["Logistics_Score"] +
+        risky_news["Tourism_Score"]
+    )
+    risky_news = risky_news.sort_values(by="Total_Risk", ascending=False)
+
+    # Highlight dangerous rows
+    def highlight_risk(row):
+        color = '#ffcccc'  # light red for risky
+        return ['background-color: {}'.format(color) if row["Total_Risk"] > 0 else '' for _ in row]
+
+    st.dataframe(
+        risky_news[["datetime", "Content", "Sector", "Insight", "source", "link"]].style.apply(highlight_risk, axis=1),
+        height=500
+    )
+
+    # Download button
     st.download_button(
-        "Download Output CSV",
-        all_news.to_csv(index=False),
-        "signals_output.csv",
+        "Download Risk CSV",
+        risky_news.to_csv(index=False),
+        "risky_news_output.csv",
         mime="text/csv"
     )
