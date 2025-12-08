@@ -438,30 +438,36 @@ elif page == "Risk Signals":
     # Filter only risky items
     risky_news = all_news[all_news["Insight"] != "Normal"].copy()
 
-    # Sort by severity (sum of scores)
-    risky_news["Total_Risk"] = (
-        risky_news["Economy_Score"] +
-        risky_news["Weather_Score"] +
-        risky_news["Social_Score"] +
-        risky_news["Logistics_Score"] +
-        risky_news["Tourism_Score"]
-    )
-    risky_news = risky_news.sort_values(by="Total_Risk", ascending=False)
+    if not risky_news.empty:
+        # Compute total risk for sorting and highlighting
+        risky_news["Total_Risk"] = (
+            risky_news["Economy_Score"] +
+            risky_news["Weather_Score"] +
+            risky_news["Social_Score"] +
+            risky_news["Logistics_Score"] +
+            risky_news["Tourism_Score"]
+        )
 
-    # Highlight dangerous rows
-    def highlight_risk(row):
-        color = '#ffcccc'  # light red for risky
-        return ['background-color: {}'.format(color) if row["Total_Risk"] > 0 else '' for _ in row]
+        # Sort by severity
+        risky_news = risky_news.sort_values(by="Total_Risk", ascending=False)
 
-    st.dataframe(
-        risky_news[["datetime", "Content", "Sector", "Insight", "source", "link"]].style.apply(highlight_risk, axis=1),
-        height=500
-    )
+        # Prepare dataframe for display (include Total_Risk for styling)
+        display_df = risky_news[["datetime", "Content", "Sector", "Insight", "source", "link", "Total_Risk"]]
 
-    # Download button
-    st.download_button(
-        "Download Risk CSV",
-        risky_news.to_csv(index=False),
-        "risky_news_output.csv",
-        mime="text/csv"
-    )
+        # Highlight rows with risk
+        def highlight_risk(row):
+            color = '#ffcccc'  # light red
+            return ['background-color: {}'.format(color) if row["Total_Risk"] > 0 else '' for _ in row]
+
+        st.dataframe(display_df.style.apply(highlight_risk, axis=1).hide_columns(["Total_Risk"]), height=500)
+
+        # Download button
+        st.download_button(
+            "Download Risk CSV",
+            risky_news.to_csv(index=False),
+            "risky_news_output.csv",
+            mime="text/csv"
+        )
+    else:
+        st.info("No risky articles detected in the selected time frame.")
+
