@@ -186,6 +186,32 @@ def fetch_newsapi():
 
     except:
         return pd.DataFrame()
+def fetch_gdelt():
+    try:
+        # Example GDELT query (adjust keywords, date, etc.)
+        url = "https://api.gdeltproject.org/api/v2/doc/doc?query=Sri+Lanka&mode=ArtList&format=json&maxrecords=50"
+        resp = requests.get(url, timeout=10).json()
+        records = []
+        now = datetime.now(timezone.utc)
+        cutoff = now - pd.Timedelta(hours=24)
+        
+        for art in resp.get("articles", []):
+            try:
+                dt = datetime.strptime(art.get("seendate",""), "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+            except:
+                dt = None
+            if dt and dt >= cutoff:
+                records.append({
+                    "title": art.get("title",""),
+                    "link": art.get("url",""),
+                    "pubDate": dt,
+                    "image": "",
+                    "source": "GDELT"
+                })
+        return pd.DataFrame(records)
+    except:
+        return pd.DataFrame()
+
 
 # -----------------------------
 # Preprocess
@@ -227,6 +253,29 @@ if len(new_newsapi) > 0:
 new_twitter = fetch_twitter()
 if len(new_twitter) > 0:
     new_twitter["source"] = "Twitter"
+
+new_gdelt = fetch_gdelt()
+if len(new_gdelt) > 0:
+    new_gdelt["source"] = "GDELT"
+
+# --- Merge all sources with old cache ---
+all_news = pd.concat([cache_df, new_rss, new_newsapi, new_twitter, new_gdelt], ignore_index=True)
+
+# --- Fill missing sources ---
+if "source" not in all_news.columns:
+    all_news["source"] = "SRSS"
+else:
+    all_news["source"] = all_news["source"].fillna("SRSS")
+
+# --- Remove duplicates ---
+all_news.drop_duplicates(subset=["link"], inplace=True)
+
+# --- Preprocess ---
+all_news = preprocess(all_news)
+
+# --- Save cache ---
+all_news.to_csv("news_cache.csv", index=False)
+
 
 # --- Merge all sources with old cache ---
 all_news = pd.concat([cache_df, new_rss, new_newsapi, new_twitter], ignore_index=True)
