@@ -353,7 +353,12 @@ if page == "Home":
 # ============================================================
 elif page == "Latest News":
     st.title("📰 Latest News")
-    st.dataframe(all_news[["datetime","Content","source","link"]])
+
+    # Sort by datetime (newest first)
+    latest_df = all_news.sort_values(by="datetime", ascending=False)
+
+    st.dataframe(latest_df[["datetime", "Content", "source", "link"]])
+
 
 # ============================================================
 # ANALYTICS PAGE
