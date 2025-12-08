@@ -85,40 +85,33 @@ TW_API_SECRET = "68XS5Q1BLd7Ne23ssgCqHWhursP2ggslnpT3j3mmo5cTyGxkA2"
 TW_ACCESS_TOKEN = "1904574098656608256-cmV7U7e8B5VmJjbQ6DRXoMEE5uTPwJ"
 TW_ACCESS_SECRET = "HOViVM12Ogm5k47tJ0sOPzuvHPkUPTlBKWb1rtFcCUiK4"
 
-def fetch_twitter():
+def fetch_newsapi(days_back=7):
     try:
-        auth = tweepy.OAuth1UserHandler(
-            TW_API_KEY, TW_API_SECRET,
-            TW_ACCESS_TOKEN, TW_ACCESS_SECRET
-        )
-        api = tweepy.API(auth, wait_on_rate_limit=True)
-
-        tweets = api.search_tweets(
-            q="Sri Lanka -filter:retweets",
-            lang="en",
-            count=50,
-            tweet_mode="extended"
-        )
-
-        records = []
+        url = f"https://newsapi.org/v2/everything?q=sri+lanka&sortBy=publishedAt&apiKey={NEWSAPI_KEY}"
+        resp = requests.get(url).json()
+        articles = resp.get("articles", [])
         now = datetime.now(timezone.utc)
-        cutoff = now - pd.Timedelta(hours=24)
+        cutoff = now - pd.Timedelta(days=days_back)
+        records = []
 
-        for tw in tweets:
-            created = tw.created_at.replace(tzinfo=timezone.utc)
-            if created >= cutoff:
+        for art in articles:
+            published = art.get("publishedAt","")
+            try:
+                dt = datetime.fromisoformat(published.replace("Z","")).replace(tzinfo=timezone.utc)
+            except:
+                dt = None
+            if dt and dt >= cutoff:
                 records.append({
-                    "title": tw.full_text.replace("\n", " "),
-                    "link": f"https://twitter.com/user/status/{tw.id}",
-                    "pubDate": created,
+                    "title": art.get("title",""),
+                    "link": art.get("url",""),
+                    "pubDate": dt,
                     "image": "",
-                    "source": "Twitter"
+                    "source": art.get("source",{}).get("name","")
                 })
-
         return pd.DataFrame(records)
-
-    except Exception as e:
+    except:
         return pd.DataFrame()
+
 
 # -----------------------------
 # RSS Feeds
@@ -165,7 +158,7 @@ def fetch_newsapi():
         resp = requests.get(url).json()
         articles = resp.get("articles", [])
         now = datetime.now(timezone.utc)
-        cutoff = now - pd.Timedelta(hours=24)
+        cutoff = now - pd.Timedelta(days=days_back)
         records = []
 
         for art in articles:
@@ -193,7 +186,7 @@ def fetch_gdelt():
         resp = requests.get(url, timeout=10).json()
         records = []
         now = datetime.now(timezone.utc)
-        cutoff = now - pd.Timedelta(hours=24)
+        cutoff = now - pd.Timedelta(days=days_back)
         
         for art in resp.get("articles", []):
             try:
@@ -334,9 +327,10 @@ if page == "Home":
 
     st.subheader("Quick Summary")
 
-    last_24h = filter_recent(all_news, 24)
+    last_24h = filter_recent(all_news, 48)
     last_3h = filter_recent(all_news, 3)
 
+    st.markdown("**Last 24 Hours**")
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Articles", len(last_24h))
     col2.metric("Sectors Detected", last_24h["Sector"].nunique())
@@ -369,7 +363,12 @@ elif page == "Analytics":
     st.subheader("🕒 Timeline of News Volume (Last 7 Days)")
     timeline_df = all_news.copy()
     timeline_df["date"] = timeline_df["datetime"].dt.date
-    timeline_count = timeline_df.groupby("date").size().reset_index(name="count")
+
+    # Create full 7-day range
+    today = datetime.now().date()
+    dates_range = pd.date_range(end=today, periods=7).date
+    timeline_count = timeline_df.groupby("date").size().reindex(dates_range, fill_value=0).reset_index()
+    timeline_count.columns = ["date", "count"]
 
     fig_timeline = px.line(
         timeline_count,
@@ -379,6 +378,7 @@ elif page == "Analytics":
         title="Daily Article Count"
     )
     st.plotly_chart(fig_timeline, use_container_width=True)
+
 
     st.subheader("📊 Sector Distribution")
     sector_counts = all_news["Sector"].value_counts()
