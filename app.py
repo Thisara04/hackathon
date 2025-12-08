@@ -215,21 +215,38 @@ except:
 # -----------------------------
 # Fetch new data
 # -----------------------------
+# --- Fetch new data ---
 new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)
-new_newsapi = fetch_newsapi()
-new_twitter = fetch_twitter()
+if len(new_rss) > 0:
+    new_rss["source"] = "RSS"
 
+new_newsapi = fetch_newsapi()
+if len(new_newsapi) > 0:
+    new_newsapi["source"] = "NewsAPI"
+
+new_twitter = fetch_twitter()
+if len(new_twitter) > 0:
+    new_twitter["source"] = "Twitter"
+
+# --- Merge all sources with old cache ---
 all_news = pd.concat([cache_df, new_rss, new_newsapi, new_twitter], ignore_index=True)
 
-# Fill missing sources with "SRSS"
+# --- Ensure source column exists ---
 if "source" not in all_news.columns:
-    all_news["source"] = "RSS"
+    all_news["source"] = "SRSS"
 else:
+    # Fill missing ONLY (do not overwrite existing)
     all_news["source"] = all_news["source"].fillna("SRSS")
 
+# --- Remove duplicates by link ---
 all_news.drop_duplicates(subset=["link"], inplace=True)
+
+# --- Preprocess the cleaned data ---
 all_news = preprocess(all_news)
+
+# --- Save cache ---
 all_news.to_csv("news_cache.csv", index=False)
+
 
 # -----------------------------
 # ML Prediction & Scoring
