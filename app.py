@@ -84,6 +84,7 @@ TW_API_KEY = "PjdzqbxWlC5gJXtP4rHEmZ2wN"
 TW_API_SECRET = "68XS5Q1BLd7Ne23ssgCqHWhursP2ggslnpT3j3mmo5cTyGxkA2"
 TW_ACCESS_TOKEN = "1904574098656608256-cmV7U7e8B5VmJjbQ6DRXoMEE5uTPwJ"
 TW_ACCESS_SECRET = "HOViVM12Ogm5k47tJ0sOPzuvHPkUPTlBKWb1rtFcCUiK4"
+TWITTER_BEARER_TOKEN = "AAAAAAAAAAAAAAAAAAAAAJKv5gEAAAAADOidEicJ9oVNKnwSms2zoxzbcc8%3DVQWh7C9Jy0Q6NsA90fR94D9mmlFcFbRcGfGE376wKhaQoQiHT2"
 
 def fetch_twitter(days_back=7): 
     try:
@@ -195,7 +196,7 @@ def fetch_rss(url):
 # -----------------------------
 NEWSAPI_KEY = "681548c940d14836b6edbb62b1d39442"
 
-def fetch_newsapi():
+def fetch_newsapi(days_back = 7):
     try:
         url = f"https://newsapi.org/v2/everything?q=sri+lanka&sortBy=publishedAt&apiKey={NEWSAPI_KEY}"
         resp = requests.get(url).json()
@@ -207,7 +208,7 @@ def fetch_newsapi():
         for art in articles:
             published = art.get("publishedAt","")
             try:
-                dt = datetime.fromisoformat(published.replace("Z","")).replace(tzinfo=timezone.utc)
+                dt = datetime.fromisoformat(published.replace("Z", "+00:00"))
             except:
                 dt = None
             if dt and dt >= cutoff:
@@ -222,7 +223,7 @@ def fetch_newsapi():
 
     except:
         return pd.DataFrame()
-def fetch_gdelt():
+def fetch_gdelt(days_back = 7):
     try:
         # Example GDELT query (adjust keywords, date, etc.)
         url = "https://api.gdeltproject.org/api/v2/doc/doc?query=Sri+Lanka&mode=ArtList&format=json&maxrecords=50"
@@ -277,6 +278,8 @@ except:
 # -----------------------------
 # Fetch new data
 # -----------------------------
+
+
 new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)
 if len(new_rss) > 0:
     new_rss["source"] = "RSS"
