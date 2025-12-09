@@ -56,6 +56,7 @@ sector_map = {
 # Keyword scoring
 # -----------------------------
 def calc_score(text, words):
+    text = str(text)
     return sum(1 for w in words if w.lower() in text.lower())
 
 economy_kw = ['stock','rupee','inflation','currency','finance','economic']
