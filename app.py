@@ -144,7 +144,6 @@ def fetch_exchange_rates():
         resp = requests.get(url).json()
 
         rates = resp.get("rates", {})
-        print("RAW API DATA:", resp)
         if not rates:
             return {}
 
@@ -404,11 +403,9 @@ if page == "Home":
     col5.metric("Sectors Detected", last_3h["Sector"].nunique())
     col6.metric("Risk Alerts", (last_3h["Insight"]!="Normal").sum())
 
-    # Fetch FX rates
+    # --- FX Rates ---
     fx = fetch_exchange_rates()
-
     st.subheader("💱 Exchange Rates (LKR →)")
-
     if fx:
         c1, c2, c3 = st.columns(3)
         c1.metric("USD", f"{fx['LKR_to_USD']:.4f}")
