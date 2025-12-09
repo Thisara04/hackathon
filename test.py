@@ -458,7 +458,7 @@ def filter_recent(df, hours):
 # HOME PAGE (🏠) - Enhanced UI
 # ============================================================
 if page == "🏠 Home":
-    st.image("photo.png", width=700)
+    st.image("photo.jpg", width=800)
     st.title("📰 Sri Lanka News Intelligence Dashboard")
     st.info(f"**Data Refreshed:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC") # UI Improvement 4: Show last refresh time
 
