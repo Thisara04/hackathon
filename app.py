@@ -257,36 +257,62 @@ def fetch_gdelt(days_back = 7):
 # -----------------------------
 # Preprocess
 # -----------------------------
+# -----------------------------
+# Preprocess
+# -----------------------------
 def preprocess(df):
     if df.empty:
         return df
 
-    # Choose the available column
+    # -------------------------
+    # 1. Detect datetime column
+    # -------------------------
     if "pubDate" in df.columns:
         df["datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
     elif "publishedAt" in df.columns:
         df["datetime"] = pd.to_datetime(df["publishedAt"], errors="coerce", utc=True)
+    elif "created_at" in df.columns:
+        df["datetime"] = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
+    elif "DATE" in df.columns:
+        # GDELT format: YYYYMMDDHHMMSS
+        df["datetime"] = pd.to_datetime(df["DATE"], format="%Y%m%d%H%M%S", errors="coerce", utc=True)
     else:
         df["datetime"] = pd.NaT
 
     df = df.dropna(subset=["datetime"])
 
-    # Combine multiple fields into content
-    df["Content"] = df.get("description", pd.Series("")) + " " + df.get("title", pd.Series(""))
+    # -------------------------
+    # 2. Combine multiple fields into content
+    # -------------------------
+    # Try common text fields; safely fallback to empty string
+    content_cols = ["Content", "content", "description", "summary", "title"]
+    df["Content"] = ""
+    for col in content_cols:
+        if col in df.columns:
+            df["Content"] += df[col].fillna("").astype(str) + " "
     df["Content"] = df["Content"].str.strip()
 
-    # Only keep rows with actual content
+    # Keep only rows with actual content
     df = df[df["Content"] != ""]
 
-    # Time features
+    # -------------------------
+    # 3. Time features for ML
+    # -------------------------
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
-    df["month_sin"] = np.sin(2*np.pi*df["month"]/12)
-    df["month_cos"] = np.cos(2*np.pi*df["month"]/12)
-    df["dow_sin"] = np.sin(2*np.pi*df["dow"]/7)
-    df["dow_cos"] = np.cos(2*np.pi*df["dow"]/7)
+    df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
+    df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
+    df["dow_sin"] = np.sin(2 * np.pi * df["dow"] / 7)
+    df["dow_cos"] = np.cos(2 * np.pi * df["dow"] / 7)
+
+    # Ensure source column exists
+    if "source" not in df.columns:
+        df["source"] = "Unknown"
+    else:
+        df["source"] = df["source"].fillna("Unknown")
 
     return df
+
 
 
 
