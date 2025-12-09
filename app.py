@@ -255,42 +255,44 @@ def fetch_gdelt(days_back = 7):
 
 
 # -----------------------------
-# Preprocess
+# Preprocess DataFrame
 # -----------------------------
 def preprocess(df):
     if df.empty:
         return df
 
-    # Always work on a copy to avoid SettingWithCopyWarning
+    # Always work on a copy
     df = df.copy()
 
     # -------------------------
     # 1. Detect datetime column
     # -------------------------
-    if "pubDate" in df.columns:
-        df.loc[:, "datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
-    elif "publishedAt" in df.columns:
-        df.loc[:, "datetime"] = pd.to_datetime(df["publishedAt"], errors="coerce", utc=True)
-    elif "created_at" in df.columns:
-        df.loc[:, "datetime"] = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
-    elif "DATE" in df.columns:
-        df.loc[:, "datetime"] = pd.to_datetime(df["DATE"], format="%Y%m%d%H%M%S", errors="coerce", utc=True)
+    datetime_col = None
+    for col in ["pubDate", "publishedAt", "created_at", "DATE"]:
+        if col in df.columns:
+            datetime_col = col
+            break
+
+    if datetime_col:
+        if datetime_col == "DATE":
+            df["datetime"] = pd.to_datetime(df[datetime_col], format="%Y%m%d%H%M%S", errors="coerce", utc=True)
+        else:
+            df["datetime"] = pd.to_datetime(df[datetime_col], errors="coerce", utc=True)
     else:
-        df.loc[:, "datetime"] = pd.NaT
+        df["datetime"] = pd.NaT
 
     # Drop rows with invalid datetime
     df = df.dropna(subset=["datetime"]).copy()
 
     # -------------------------
-    # 2. Combine multiple fields into content safely
+    # 2. Combine multiple fields into Content
     # -------------------------
     content_cols = ["Content", "content", "description", "summary", "title"]
-    df.loc[:, "Content"] = ""
+    df["Content"] = ""
     for col in content_cols:
         if col in df.columns:
-            # fill NaN with empty string and ensure str type
-            df.loc[:, "Content"] += df[col].fillna("").astype(str) + " "
-    df.loc[:, "Content"] = df["Content"].str.strip()
+            df["Content"] += df[col].fillna("").astype(str) + " "
+    df["Content"] = df["Content"].str.strip()
 
     # Only keep rows with actual content
     df = df.loc[df["Content"] != ""].copy()
@@ -298,20 +300,21 @@ def preprocess(df):
     # -------------------------
     # 3. Time features for ML
     # -------------------------
-    df.loc[:, "month"] = df["datetime"].dt.month
-    df.loc[:, "dow"] = df["datetime"].dt.dayofweek
-    df.loc[:, "month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
-    df.loc[:, "month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
-    df.loc[:, "dow_sin"] = np.sin(2 * np.pi * df["dow"] / 7)
-    df.loc[:, "dow_cos"] = np.cos(2 * np.pi * df["dow"] / 7)
+    df["month"] = df["datetime"].dt.month
+    df["dow"] = df["datetime"].dt.dayofweek
+    df["month_sin"] = np.sin(2 * np.pi * df["month"] / 12)
+    df["month_cos"] = np.cos(2 * np.pi * df["month"] / 12)
+    df["dow_sin"] = np.sin(2 * np.pi * df["dow"] / 7)
+    df["dow_cos"] = np.cos(2 * np.pi * df["dow"] / 7)
 
     # Ensure source column exists
     if "source" not in df.columns:
-        df.loc[:, "source"] = "Unknown"
+        df["source"] = "Unknown"
     else:
-        df.loc[:, "source"] = df["source"].fillna("Unknown")
+        df["source"] = df["source"].fillna("Unknown")
 
     return df
+
 
 
 # -----------------------------
