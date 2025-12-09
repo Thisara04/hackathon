@@ -428,7 +428,7 @@ def filter_recent(df, hours):
 # HOME PAGE
 # ============================================================
 if page == "Home":
-    st.image("photo.png", width=700)
+    st.image("photo.jpg", width=800)
     st.title("📰 Sri Lanka News Intelligence Dashboard")
     st.write("Real-time news & social intelligence for Sri Lanka.")
 
