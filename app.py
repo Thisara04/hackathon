@@ -440,7 +440,7 @@ if page == "Home":
 
     st.subheader("Quick Summary")
 
-    last_24h = filter_recent(all_news, 72)
+    last_24h = filter_recent(all_news, 60)
     last_3h = filter_recent(all_news, 12)
 
     st.markdown("**Last 12 Hours**")
