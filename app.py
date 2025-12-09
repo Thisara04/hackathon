@@ -155,6 +155,7 @@ def fetch_exchange_rates():
         }
     except Exception as e:
         print("Exchange rate fetch error:", e)
+        print("RAW API DATA:", resp)
         return {}
 
 
