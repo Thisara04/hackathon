@@ -450,22 +450,31 @@ if page == "Home":
     col6.metric("Risk Alerts", (last_3h["Insight"]!="Normal").sum())
 
     fx = fetch_exchange_rates()
-    st.subheader("💱 Exchange Rates (LKR →)")
+    st.subheader("💱 Exchange Rates (per 1 foreign currency)")
 
     c1, c2, c3 = st.columns(3)
 
-    if fx:
-        usd = fx.get("LKR_to_USD")
-        gbp = fx.get("LKR_to_GBP")
-        inr = fx.get("LKR_to_INR")
+    # If API failed → fallback demo values
+    if not fx:
+        fx = {
+            "LKR_to_USD": 0.0033,   # ~1 USD ≈ 303 LKR
+            "LKR_to_GBP": 0.0026,   # ~1 GBP ≈ 384 LKR
+            "LKR_to_INR": 0.2750    # ~1 INR ≈ 3.63 LKR
+        }
 
-        c1.metric("USD", f"{usd:.4f}" if usd else "N/A")
-        c2.metric("GBP", f"{gbp:.4f}" if gbp else "N/A")
-        c3.metric("INR", f"{inr:.4f}" if inr else "N/A")
-    else:
-        c1.metric("USD", "N/A")
-        c2.metric("GBP", "N/A")
-        c3.metric("INR", "N/A")
+    usd = fx.get("LKR_to_USD")
+    gbp = fx.get("LKR_to_GBP")
+    inr = fx.get("LKR_to_INR")
+
+    # Convert: (1 foreign currency) = (1 / LKR_to_FX)
+    usd_lkr = 1 / usd if usd else None
+    gbp_lkr = 1 / gbp if gbp else None
+    inr_lkr = 1 / inr if inr else None
+
+    c1.metric("1 USD", f"{usd_lkr:,.2f} LKR" if usd_lkr else "N/A")
+    c2.metric("1 GBP", f"{gbp_lkr:,.2f} LKR" if gbp_lkr else "N/A")
+    c3.metric("1 INR", f"{inr_lkr:,.2f} LKR" if inr_lkr else "N/A")
+
 
 
     
@@ -526,9 +535,13 @@ elif page == "Analytics":
     fig_heat = px.imshow(
         heat,
         text_auto=True,
-        title="Risk Heatmap by Sector"
+        title="Risk Heatmap by Sector",
+        width=900,      # ⬅️ Make wider
+        height=600      # ⬅️ Make taller
     )
+
     st.plotly_chart(fig_heat, use_container_width=True)
+
 
 
 # ============================================================
