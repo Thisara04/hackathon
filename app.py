@@ -548,7 +548,7 @@ elif page == "Analytics":
 # RISK SIGNALS PAGE
 # ============================================================
 elif page == "Risk Signals":
-    st.title("⚠️ Risk Signals & Insights")
+    st.title("⚠️ Alert Signals & Insights")
 
     # Calculate heat
     heat = all_news.groupby("Sector")[[
@@ -564,7 +564,7 @@ elif page == "Risk Signals":
     col4.metric("Logistics Alerts", heat["Logistics_Score"].sum())
     col5.metric("Tourism Signals", heat["Tourism_Score"].sum())
 
-    st.subheader("Top Risk Articles")
+    st.subheader("Top Alert Articles")
 
     # Filter only risky items
     risky_news = all_news.loc[all_news["Insight"] != "Normal"].copy()
