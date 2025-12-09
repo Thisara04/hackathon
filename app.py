@@ -206,7 +206,7 @@ def fetch_newsapi(days_back = 7):
         now = datetime.now(timezone.utc)
         cutoff = now - pd.Timedelta(days=days_back)
         records = []
-        st.write("NewsAPI rows fetched:", len(new_newsapi))
+        
         for art in articles:
             published = art.get("publishedAt","")
             try:
