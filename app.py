@@ -370,7 +370,16 @@ all_news.to_csv("news_cache.csv", index=False)
 # ML Prediction & Scoring
 # -----------------------------
 if not all_news.empty:
-    X_text = all_news["Content"].fillna("").astype(str).tolist()
+    # Force every entry to be a string and drop bad rows
+    all_news["Content"] = all_news["Content"].fillna("").astype(str)
+
+    # Optional: filter out rows that are still empty after conversion
+    all_news = all_news.loc[all_news["Content"].str.strip() != ""].copy()
+
+    # Debug: check row count
+    print("Encoding rows:", all_news.shape[0])
+
+    X_text = all_news["Content"].tolist()
     X_emb = embedder.encode(X_text, convert_to_numpy=True)
 
     X_time = all_news[["month_sin","month_cos","dow_sin","dow_cos"]].to_numpy()
