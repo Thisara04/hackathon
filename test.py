@@ -586,11 +586,10 @@ elif page == "📈 Analytics":
         timeline_count = timeline_df.groupby("date").size().reindex(dates_range, fill_value=0).reset_index()
         timeline_count.columns = ["date", "count"]
 
-        fig_timeline = px.line(
+        fig_timeline = px.bar(
             timeline_count,
             x="date",
             y="count",
-            markers=True,
             title="Daily Article Count (Last 7 Days)",
             height=400
         )
