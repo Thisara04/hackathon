@@ -31,6 +31,8 @@ page = st.sidebar.radio(
     ["🏠 Home", "📰 Latest News", "📈 Analytics", "⚠️ Risk Signals"]
 )
 
+st.sidebar.caption("Auto-refreshing data every 10 minutes.")
+
 # -----------------------------
 # UPDATE BUTTON
 # -----------------------------
