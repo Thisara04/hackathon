@@ -256,16 +256,47 @@ def fetch_gdelt(days_back = 7):
 def preprocess(df):
     if df.empty:
         return df
-    df["datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
+
+    # -------------------------
+    # 1. Detect datetime column
+    # -------------------------
+    if "pubDate" in df.columns:
+        df["datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
+    elif "publishedAt" in df.columns:
+        df["datetime"] = pd.to_datetime(df["publishedAt"], errors="coerce", utc=True)
+    elif "created_at" in df.columns:
+        df["datetime"] = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
+    elif "DATE" in df.columns:
+        # GDELT format: YYYYMMDDHHMMSS
+        df["datetime"] = pd.to_datetime(df["DATE"], format="%Y%m%d%H%M%S", errors="coerce", utc=True)
+    else:
+        df["datetime"] = pd.NaT
+
     df = df.dropna(subset=["datetime"])
+
+    # -------------------------
+    # 2. Create time features
+    # -------------------------
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
     df["month_sin"] = np.sin(2*np.pi*df["month"]/12)
     df["month_cos"] = np.cos(2*np.pi*df["month"]/12)
     df["dow_sin"] = np.sin(2*np.pi*df["dow"]/7)
     df["dow_cos"] = np.cos(2*np.pi*df["dow"]/7)
-    df["Content"] = df["title"].astype(str)
+
+    # -------------------------
+    # 3. Create clean content text
+    # -------------------------
+    content_cols = ["Content", "content", "description", "summary", "title"]
+    for c in content_cols:
+        if c in df.columns:
+            df["Content"] = df[c].astype(str)
+            break
+    else:
+        df["Content"] = ""
+
     return df
+
 
 # -----------------------------
 # Load cache
