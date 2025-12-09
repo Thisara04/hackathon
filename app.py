@@ -260,26 +260,17 @@ def preprocess(df):
     if df.empty:
         return df
 
-    # -------------------------
-    # 1. Detect datetime column
-    # -------------------------
-    if "pubDate" in df.columns:
-        df["datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
-    elif "publishedAt" in df.columns:
-        df["datetime"] = pd.to_datetime(df["publishedAt"], errors="coerce", utc=True)
-    elif "created_at" in df.columns:
-        df["datetime"] = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
-    elif "DATE" in df.columns:
-        # GDELT format: YYYYMMDDHHMMSS
-        df["datetime"] = pd.to_datetime(df["DATE"], format="%Y%m%d%H%M%S", errors="coerce", utc=True)
-    else:
-        df["datetime"] = pd.NaT
-
+    df["datetime"] = pd.to_datetime(df.get("pubDate") or df.get("publishedAt"), errors="coerce", utc=True)
     df = df.dropna(subset=["datetime"])
 
-    # -------------------------
-    # 2. Create time features
-    # -------------------------
+    # Combine multiple fields into content
+    df["Content"] = df.get("description").fillna("") + " " + df.get("title").fillna("")
+    df["Content"] = df["Content"].str.strip()
+
+    # Only keep rows with actual content
+    df = df[df["Content"] != ""]
+
+    # Time features
     df["month"] = df["datetime"].dt.month
     df["dow"] = df["datetime"].dt.dayofweek
     df["month_sin"] = np.sin(2*np.pi*df["month"]/12)
@@ -287,18 +278,8 @@ def preprocess(df):
     df["dow_sin"] = np.sin(2*np.pi*df["dow"]/7)
     df["dow_cos"] = np.cos(2*np.pi*df["dow"]/7)
 
-    # -------------------------
-    # 3. Create clean content text
-    # -------------------------
-    content_cols = ["Content", "content", "description", "summary", "title"]
-    for c in content_cols:
-        if c in df.columns:
-            df["Content"] = df[c].astype(str)
-            break
-    else:
-        df["Content"] = ""
-
     return df
+
 
 
 # -----------------------------
