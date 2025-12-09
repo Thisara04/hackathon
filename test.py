@@ -180,7 +180,10 @@ RSS_FEEDS = [
     "https://www.dailymirror.lk/rss/top_story/155",
     "https://economynext.com/feed/",
     "https://www.news.lk/news?format=feed",
-    "https://www.onlanka.com/feed"
+    "https://www.onlanka.com/feed",
+    "https://ceylontoday.lk/feed/",
+    "https://www.hirunews.lk/rss/eng/news-feed.xml",
+    "https://adaderana.lk/rss.php"
 ]
 
 def clean_rss_xml(text):
