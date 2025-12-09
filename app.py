@@ -13,7 +13,6 @@ import tweepy
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 
-
 # -----------------------------
 # Page Config
 # -----------------------------
@@ -132,22 +131,16 @@ def fetch_twitter(days_back=7):
     except Exception as e:
         print("Twitter fetch error:", e)
         return pd.DataFrame()
-        
-#econ data feed
+
 @st.cache_data(ttl=1800)
 def fetch_exchange_rates():
-    '''
-    Fetch real-time exchange rates for LKR → USD, GBP, and INR
-    using the free ExchangeRate.host API.
-    '''
     try:
         url = "https://api.exchangerate.host/latest?base=LKR&symbols=USD,GBP,INR"
-        resp = requests.get(url).json()
+        resp = requests.get(url, timeout=5).json()
 
         rates = resp.get("rates", {})
-        #print("RAW API DATA:", resp)
         if not rates:
-            return {}
+            return None
 
         return {
             "LKR_to_USD": rates.get("USD"),
@@ -156,8 +149,9 @@ def fetch_exchange_rates():
             "timestamp": resp.get("date")
         }
     except Exception as e:
-        print("Exchange rate fetch error:", e)
-        return {}
+        st.write(f"⚠️ Warning: could not fetch FX — {e}")
+        return None
+
 
 
 # -----------------------------
@@ -455,16 +449,24 @@ if page == "Home":
     col5.metric("Sectors Detected", last_3h["Sector"].nunique())
     col6.metric("Risk Alerts", (last_3h["Insight"]!="Normal").sum())
 
-    # --- FX Rates ---
     fx = fetch_exchange_rates()
     st.subheader("💱 Exchange Rates (LKR →)")
+
+    c1, c2, c3 = st.columns(3)
+
     if fx:
-        c1, c2, c3 = st.columns(3)
-        c1.metric("USD", f"{fx['LKR_to_USD']:.4f}")
-        c2.metric("GBP", f"{fx['LKR_to_GBP']:.4f}")
-        c3.metric("INR", f"{fx['LKR_to_INR']:.4f}")
+        usd = fx.get("LKR_to_USD")
+        gbp = fx.get("LKR_to_GBP")
+        inr = fx.get("LKR_to_INR")
+
+        c1.metric("USD", f"{usd:.4f}" if usd else "N/A")
+        c2.metric("GBP", f"{gbp:.4f}" if gbp else "N/A")
+        c3.metric("INR", f"{inr:.4f}" if inr else "N/A")
     else:
-        st.info("Exchange rate data unavailable at the moment.")
+        c1.metric("USD", "N/A")
+        c2.metric("GBP", "N/A")
+        c3.metric("INR", "N/A")
+
 
     
 
