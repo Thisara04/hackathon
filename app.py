@@ -370,8 +370,9 @@ all_news.to_csv("news_cache.csv", index=False)
 # ML Prediction & Scoring
 # -----------------------------
 if not all_news.empty:
-    X_text = all_news["Content"].tolist()
+    X_text = all_news["Content"].fillna("").astype(str).tolist()
     X_emb = embedder.encode(X_text, convert_to_numpy=True)
+
     X_time = all_news[["month_sin","month_cos","dow_sin","dow_cos"]].to_numpy()
     X = np.hstack([X_emb, X_time])
     all_news["SectorID"] = classifier.predict(X)
