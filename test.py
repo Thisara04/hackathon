@@ -465,25 +465,25 @@ if page == "🏠 Home":
     st.header("Quick Summary")
 
     # UI Improvement 5: Using tabs for time comparison
-    tab1, tab2 = st.tabs(["**Last 24 Hours**", "**Last 3 Hours**"])
+    tab1, tab2 = st.tabs(["**Last 12 Hours**", "**Last 3 Hours**"])
 
-    # --- Last 24 Hours ---
+    # --- Last 12 Hours ---
     with tab1:
-        last_24h = filter_recent(all_news, 24)
+        last_12h = filter_recent(all_news, 48)
         col1, col2, col3 = st.columns(3)
-        col1.metric("Total Articles", len(last_24h), help="Total unique articles fetched across all sources in the last 24 hours.")
-        col2.metric("Sectors Detected", last_24h["Sector"].nunique(), delta=f"out of {len(sector_map)} total", delta_color="off", help="Number of unique sectors found in articles.")
-        col3.metric("Risk Alerts", (last_24h["Insight"]!="Normal").sum(), help="Number of articles that triggered a keyword-based risk signal.")
+        col1.metric("Total Articles", len(last_12h), help="Total unique articles fetched across all sources in the last 12 hours.")
+        col2.metric("Sectors Detected", last_12h["Sector"].nunique(), delta=f"out of {len(sector_map)} total", delta_color="off", help="Number of unique sectors found in articles.")
+        col3.metric("Risk Alerts", (last_12h["Insight"]!="Normal").sum(), help="Number of articles that triggered a keyword-based risk signal.")
 
         # UI Improvement 6: Display top sectors as a compact list
-        st.subheader("Top Article Sources (24h)")
-        source_counts = last_24h["source"].value_counts().head(5)
+        st.subheader("Top Article Sources (12h)")
+        source_counts = last_12h["source"].value_counts().head(5)
         st.dataframe(source_counts.reset_index().rename(columns={'index':'Source', 'source':'Count'}), hide_index=True)
 
 
     # --- Last 3 Hours ---
     with tab2:
-        last_3h = filter_recent(all_news, 3)
+        last_3h = filter_recent(all_news, 8)
         col4, col5, col6 = st.columns(3)
         col4.metric("Total Articles", len(last_3h))
         col5.metric("Sectors Detected", last_3h["Sector"].nunique())
@@ -501,7 +501,7 @@ if page == "🏠 Home":
     c1, c2, c3 = st.columns(3)
 
     if not fx:
-        st.warning("Could not fetch real-time exchange rates. Displaying placeholder data.")
+        #st.warning("Could not fetch real-time exchange rates. Displaying placeholder data.")
         fx = {
             "LKR_to_USD": 0.0033,
             "LKR_to_GBP": 0.0026,
