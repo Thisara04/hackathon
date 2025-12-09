@@ -528,21 +528,6 @@ elif page == "Analytics":
     )
     st.plotly_chart(fig_heat, use_container_width=True)
 
-    st.subheader("☁️ Frequent Keywords (Word Cloud)")
-    text_blob = " ".join(all_news["Content"].astype(str).tolist())
-
-    wc = WordCloud(
-        width=1600,
-        height=800,
-        background_color="white",
-        collocations=False,
-        max_words=20
-    ).generate(text_blob)
-
-    fig_wc = plt.figure(figsize=(12,6))
-    plt.imshow(wc, interpolation="bilinear")
-    plt.axis("off")
-    st.pyplot(fig_wc)
 
 # ============================================================
 # RISK SIGNALS PAGE
