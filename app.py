@@ -145,7 +145,7 @@ def fetch_exchange_rates():
         resp = requests.get(url).json()
 
         rates = resp.get("rates", {})
-        print("RAW API DATA:", resp)
+        #print("RAW API DATA:", resp)
         if not rates:
             return {}
 
@@ -434,14 +434,14 @@ def filter_recent(df, hours):
 # HOME PAGE
 # ============================================================
 if page == "Home":
-    st.image("photo.png", width=800)
+    st.image("photo.png", width=700)
     st.title("📰 Sri Lanka News Intelligence Dashboard")
     st.write("Real-time news & social intelligence for Sri Lanka.")
 
     st.subheader("Quick Summary")
 
-    last_24h = filter_recent(all_news, 48)
-    last_3h = filter_recent(all_news, 3)
+    last_24h = filter_recent(all_news, 72)
+    last_3h = filter_recent(all_news, 12)
 
     st.markdown("**Last 12 Hours**")
     col1, col2, col3 = st.columns(3)
