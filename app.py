@@ -133,6 +133,7 @@ def fetch_twitter(days_back=7):
         return pd.DataFrame()
         
 #econ data feed
+@st.cache_data(ttl=1800)
 def fetch_exchange_rates():
     '''
     Fetch real-time exchange rates for LKR → USD, GBP, and INR
@@ -401,6 +402,21 @@ if page == "Home":
     col4.metric("Total Articles", len(last_3h))
     col5.metric("Sectors Detected", last_3h["Sector"].nunique())
     col6.metric("Risk Alerts", (last_3h["Insight"]!="Normal").sum())
+
+    # Fetch FX rates
+    fx = fetch_exchange_rates()
+
+    st.subheader("💱 Exchange Rates (LKR →)")
+
+    if fx:
+        c1, c2, c3 = st.columns(3)
+        c1.metric("USD", f"{fx['LKR_to_USD']:.4f}")
+        c2.metric("GBP", f"{fx['LKR_to_GBP']:.4f}")
+        c3.metric("INR", f"{fx['LKR_to_INR']:.4f}")
+    else:
+        st.info("Exchange rate data unavailable at the moment.")
+
+    
 
 # ============================================================
 # LATEST NEWS PAGE
