@@ -144,6 +144,7 @@ def fetch_exchange_rates():
         resp = requests.get(url).json()
 
         rates = resp.get("rates", {})
+        print("RAW API DATA:", resp)
         if not rates:
             return {}
 
