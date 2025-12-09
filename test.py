@@ -34,10 +34,10 @@ page = st.sidebar.radio(
 # -----------------------------
 # UPDATE BUTTON
 # -----------------------------
-if st.sidebar.button("🔄 Refresh Data Cache", type="primary"): # UI Improvement 3: Use primary button type
-    st.cache_data.clear()
-    st.cache_resource.clear()
-    st.experimental_rerun()
+#if st.sidebar.button("🔄 Refresh Data Cache", type="primary"): # UI Improvement 3: Use primary button type
+    #st.cache_data.clear()
+    #st.cache_resource.clear()
+    #st.experimental_rerun()
 
 # -----------------------------
 # Load Models
@@ -592,35 +592,19 @@ elif page == "📈 Analytics":
 
         st.divider()
 
-        # --- Row 2: Sector and Source Distribution ---
-        col_pie, col_bar = st.columns(2)
-
-        with col_pie:
-            st.subheader("Sector Distribution")
-            sector_counts = all_news["Sector"].value_counts()
-            fig_pie = px.pie(
-                values=sector_counts.values,
-                names=sector_counts.index,
-                title="News per Sector",
-                hole=0.4, # UI Improvement 11: Make it a donut chart
-                height=400
-            )
-            fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-            st.plotly_chart(fig_pie, use_container_width=True)
-
-        with col_bar:
-            st.subheader("Source Distribution")
-            source_counts_top = all_news["source"].value_counts().nlargest(10)
-            fig_bar = px.bar(
-                source_counts_top,
-                x=source_counts_top.index,
-                y=source_counts_top.values,
-                title="Top 10 Article Sources",
-                height=400
-            )
-            fig_bar.update_layout(xaxis_title="Source", yaxis_title="Count")
-            st.plotly_chart(fig_bar, use_container_width=True)
-
+        # --- Row 2: Sector Distribution ---
+        st.subheader("Sector Distribution")
+        sector_counts = all_news["Sector"].value_counts()
+        fig_pie = px.pie(
+            values=sector_counts.values,
+            names=sector_counts.index,
+            title="News per Sector",
+            hole=0.4, 
+            height=400
+        )
+        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+        st.plotly_chart(fig_pie, use_container_width=True)
+        
         st.divider()
 
         # --- Row 3: Heatmap ---
