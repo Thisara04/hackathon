@@ -257,12 +257,11 @@ def fetch_gdelt(days_back = 7):
 # -----------------------------
 # Preprocess
 # -----------------------------
-# -----------------------------
-# Preprocess
-# -----------------------------
 def preprocess(df):
     if df.empty:
         return df
+
+    df = df.copy()  # avoid SettingWithCopyWarning
 
     # -------------------------
     # 1. Detect datetime column
@@ -274,26 +273,25 @@ def preprocess(df):
     elif "created_at" in df.columns:
         df["datetime"] = pd.to_datetime(df["created_at"], errors="coerce", utc=True)
     elif "DATE" in df.columns:
-        # GDELT format: YYYYMMDDHHMMSS
         df["datetime"] = pd.to_datetime(df["DATE"], format="%Y%m%d%H%M%S", errors="coerce", utc=True)
     else:
         df["datetime"] = pd.NaT
 
-    df = df.dropna(subset=["datetime"])
+    df = df.dropna(subset=["datetime"]).copy()
 
     # -------------------------
-    # 2. Combine multiple fields into content
+    # 2. Combine multiple fields into content safely
     # -------------------------
-    # Try common text fields; safely fallback to empty string
     content_cols = ["Content", "content", "description", "summary", "title"]
     df["Content"] = ""
     for col in content_cols:
         if col in df.columns:
+            # fill NaN with empty string and ensure str type
             df["Content"] += df[col].fillna("").astype(str) + " "
     df["Content"] = df["Content"].str.strip()
 
-    # Keep only rows with actual content
-    df = df[df["Content"] != ""]
+    # Only keep rows with actual content
+    df = df.loc[df["Content"] != ""].copy()
 
     # -------------------------
     # 3. Time features for ML
@@ -312,6 +310,7 @@ def preprocess(df):
         df["source"] = df["source"].fillna("Unknown")
 
     return df
+
 
 
 
