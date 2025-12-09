@@ -392,7 +392,7 @@ if page == "Home":
     last_24h = filter_recent(all_news, 48)
     last_3h = filter_recent(all_news, 3)
 
-    st.markdown("**Last 24 Hours**")
+    st.markdown("**Last 12 Hours**")
     col1, col2, col3 = st.columns(3)
     col1.metric("Total Articles", len(last_24h))
     col2.metric("Sectors Detected", last_24h["Sector"].nunique())
