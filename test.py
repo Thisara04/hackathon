@@ -469,7 +469,7 @@ if page == "🏠 Home":
 
     # --- Last 12 Hours ---
     with tab1:
-        last_12h = filter_recent(all_news, 48)
+        last_12h = filter_recent(all_news, 30)
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Articles", len(last_12h), help="Total unique articles fetched across all sources in the last 12 hours.")
         col2.metric("Sectors Detected", last_12h["Sector"].nunique(), delta=f"out of {len(sector_map)} total", delta_color="off", help="Number of unique sectors found in articles.")
