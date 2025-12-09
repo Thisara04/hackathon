@@ -367,31 +367,55 @@ all_news = preprocess(all_news)
 all_news.to_csv("news_cache.csv", index=False)
 
 # -----------------------------
-# ML Prediction & Scoring
+# ML Prediction & Scoring (Safe Version)
 # -----------------------------
 if not all_news.empty:
-    # Force every entry to be a string and drop bad rows
+    # Ensure 'Content' exists and is string
+    if "Content" not in all_news.columns:
+        all_news["Content"] = ""
     all_news["Content"] = all_news["Content"].fillna("").astype(str)
 
-    # Optional: filter out rows that are still empty after conversion
+    # Drop rows that are empty or just whitespace
     all_news = all_news.loc[all_news["Content"].str.strip() != ""].copy()
 
-    # Debug: check row count
-    print("Encoding rows:", all_news.shape[0])
+    # Only proceed if we have rows to process
+    if len(all_news) > 0:
+        # Debug: check number of rows to encode
+        print("Encoding rows:", all_news.shape[0])
 
-    X_text = all_news["Content"].tolist()
-    X_emb = embedder.encode(X_text, convert_to_numpy=True)
+        # Text embeddings
+        X_text = all_news["Content"].tolist()
+        X_emb = embedder.encode(X_text, convert_to_numpy=True)
 
-    X_time = all_news[["month_sin","month_cos","dow_sin","dow_cos"]].to_numpy()
-    X = np.hstack([X_emb, X_time])
-    all_news["SectorID"] = classifier.predict(X)
-    all_news["Sector"] = all_news["SectorID"].map(sector_map)
-    all_news["Economy_Score"] = all_news["Content"].apply(lambda x: calc_score(x, economy_kw))
-    all_news["Weather_Score"] = all_news["Content"].apply(lambda x: calc_score(x, weather_kw))
-    all_news["Social_Score"] = all_news["Content"].apply(lambda x: calc_score(x, social_kw))
-    all_news["Logistics_Score"] = all_news["Content"].apply(lambda x: calc_score(x, logistics_kw))
-    all_news["Tourism_Score"] = all_news["Content"].apply(lambda x: calc_score(x, tourism_kw))
-    all_news["Insight"] = all_news.apply(generate_insight, axis=1)
+        # Time-based features
+        time_cols = ["month_sin", "month_cos", "dow_sin", "dow_cos"]
+        for col in time_cols:
+            if col not in all_news.columns:
+                all_news[col] = 0.0  # fallback if column missing
+
+        X_time = all_news[time_cols].to_numpy()
+
+        # Combine embeddings and time features
+        X = np.hstack([X_emb, X_time])
+
+        # Sector prediction
+        all_news["SectorID"] = classifier.predict(X)
+        all_news["Sector"] = all_news["SectorID"].map(sector_map)
+
+        # Keyword-based scoring
+        all_news["Economy_Score"] = all_news["Content"].apply(lambda x: calc_score(x, economy_kw))
+        all_news["Weather_Score"] = all_news["Content"].apply(lambda x: calc_score(x, weather_kw))
+        all_news["Social_Score"] = all_news["Content"].apply(lambda x: calc_score(x, social_kw))
+        all_news["Logistics_Score"] = all_news["Content"].apply(lambda x: calc_score(x, logistics_kw))
+        all_news["Tourism_Score"] = all_news["Content"].apply(lambda x: calc_score(x, tourism_kw))
+
+        # Generate combined insights
+        all_news["Insight"] = all_news.apply(generate_insight, axis=1)
+    else:
+        print("No valid content rows to process for ML predictions.")
+else:
+    print("All_news DataFrame is empty. Skipping ML predictions.")
+
 
 # -----------------------------
 # Filter recent data
