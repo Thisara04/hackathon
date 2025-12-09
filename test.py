@@ -461,8 +461,6 @@ if page == "🏠 Home":
     st.image("photo.jpg", width=800)
     st.title("🌐 CeylonScope")
     st.caption("Sri Lanka News Intelligence Dashboard")
-    st.info(f"**Data Refreshed:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC")  # Show last refresh time
-
     st.info(f"**Data Refreshed:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC") # UI Improvement 4: Show last refresh time
 
     st.header("Quick Summary")
