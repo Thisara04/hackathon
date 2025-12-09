@@ -260,11 +260,18 @@ def preprocess(df):
     if df.empty:
         return df
 
-    df["datetime"] = pd.to_datetime(df.get("pubDate") or df.get("publishedAt"), errors="coerce", utc=True)
+    # Choose the available column
+    if "pubDate" in df.columns:
+        df["datetime"] = pd.to_datetime(df["pubDate"], errors="coerce", utc=True)
+    elif "publishedAt" in df.columns:
+        df["datetime"] = pd.to_datetime(df["publishedAt"], errors="coerce", utc=True)
+    else:
+        df["datetime"] = pd.NaT
+
     df = df.dropna(subset=["datetime"])
 
     # Combine multiple fields into content
-    df["Content"] = df.get("description").fillna("") + " " + df.get("title").fillna("")
+    df["Content"] = df.get("description", pd.Series("")) + " " + df.get("title", pd.Series(""))
     df["Content"] = df["Content"].str.strip()
 
     # Only keep rows with actual content
@@ -279,6 +286,7 @@ def preprocess(df):
     df["dow_cos"] = np.cos(2*np.pi*df["dow"]/7)
 
     return df
+
 
 
 
@@ -498,9 +506,10 @@ elif page == "Risk Signals":
     st.subheader("Top Risk Articles")
 
     # Filter only risky items
-    risky_news = all_news[all_news["Insight"] != "Normal"].copy()
+    risky_news = all_news.loc[all_news["Insight"] != "Normal"].copy()
 
-    if not risky_news.empty:
+    # Check if DataFrame has rows
+    if risky_news.shape[0] > 0:
         # Compute total risk for sorting
         risky_news["Total_Risk"] = (
             risky_news["Economy_Score"] +
@@ -513,21 +522,16 @@ elif page == "Risk Signals":
         # Sort by severity
         risky_news = risky_news.sort_values(by="Total_Risk", ascending=False)
 
-        # Display table without color
         display_df = risky_news[["datetime", "Content", "Sector", "Insight", "source", "link"]].copy()
         st.dataframe(display_df, height=500)
 
-        from wordcloud import WordCloud
-        import matplotlib.pyplot as plt
-
+        # Wordcloud
         text_blob = " ".join(risky_news["Content"].astype(str).tolist())
         wc = WordCloud(width=1200, height=600, background_color="white", max_words=50).generate(text_blob)
-
         fig_wc = plt.figure(figsize=(12,6))
         plt.imshow(wc, interpolation="bilinear")
         plt.axis("off")
         st.pyplot(fig_wc)
-
 
         # Download button
         st.download_button(
@@ -538,5 +542,6 @@ elif page == "Risk Signals":
         )
     else:
         st.info("No risky articles detected in the selected time frame.")
+
 
 
