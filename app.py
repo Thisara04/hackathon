@@ -535,6 +535,18 @@ elif page == "Risk Signals":
         display_df = risky_news[["datetime", "Content", "Sector", "Insight", "source", "link"]].copy()
         st.dataframe(display_df, height=500)
 
+        from wordcloud import WordCloud
+        import matplotlib.pyplot as plt
+
+        text_blob = " ".join(risky_news["Content"].astype(str).tolist())
+        wc = WordCloud(width=1200, height=600, background_color="white", max_words=50).generate(text_blob)
+
+        fig_wc = plt.figure(figsize=(12,6))
+        plt.imshow(wc, interpolation="bilinear")
+        plt.axis("off")
+        st.pyplot(fig_wc)
+
+
         # Download button
         st.download_button(
             "Download Risk CSV",
