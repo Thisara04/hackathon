@@ -150,24 +150,48 @@ def fetch_twitter(days_back=7):
 
 @st.cache_data(ttl=1800)
 def fetch_exchange_rates():
+    # Use a more reliable, simple API
+    url = "https://open.er-api.com/v6/latest/LKR" 
+    
     try:
-        url = "https://api.exchangerate.host/latest?base=LKR&symbols=USD,GBP,INR"
-        resp = requests.get(url, timeout=5).json()
+        # 1. Attempt the request
+        resp = requests.get(url, timeout=5)
+        
+        # 2. Check for successful status code (e.g., 200)
+        if resp.status_code != 200:
+            print(f"FX fetch error: Received status code {resp.status_code} from API.")
+            return None # Return None on failure
 
-        rates = resp.get("rates", {})
+        # 3. Attempt to parse JSON
+        data = resp.json()
+        
+        # 4. Check for expected data keys (robustness)
+        rates = data.get("rates", {})
         if not rates:
+            print("FX fetch error: 'rates' key missing or empty in API response.")
             return None
 
+        # Success: Return the mapped data
         return {
             "LKR_to_USD": rates.get("USD"),
             "LKR_to_GBP": rates.get("GBP"),
             "LKR_to_INR": rates.get("INR"),
-            "timestamp": resp.get("date")
+            # The new API uses this key for the timestamp
+            "timestamp": data.get("time_last_update_utc") 
         }
+
+    except requests.exceptions.RequestException as e:
+        # Catches all network/connection/timeout errors
+        print(f"FX fetch error (Connection/Timeout): {e}")
+        return None # Return None on connection failure
+        
     except Exception as e:
-        # st.write(f"⚠️ Warning: could not fetch FX — {e}") # Removed for cleaner UI
-        print(f"FX fetch error: {e}")
-        return None
+        # Catches JSON decoding or any other unexpected error
+        print(f"FX fetch error (General Error): {e}")
+        return None # Return None on general failure
+
+# NOTE: The homepage code below will now use the fallback/placeholder values 
+# if this function returns None, ensuring the app doesn't crash.
 
 
 
