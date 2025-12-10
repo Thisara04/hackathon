@@ -531,9 +531,9 @@ if page == "🏠 Home":
     if not fx:
         #st.warning("Could not fetch real-time exchange rates. Displaying placeholder data.")
         fx = {
-            "LKR_to_USD": 0.0033,
-            "LKR_to_GBP": 0.0026,
-            "LKR_to_INR": 0.2912
+            "LKR_to_USD": 0.003239,
+            "LKR_to_GBP": 0.002433,
+            "LKR_to_INR": 0.291290
         }
 
     usd = fx.get("LKR_to_USD")
