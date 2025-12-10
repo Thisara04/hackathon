@@ -153,34 +153,50 @@ EXCHANGE_RATE_API_KEY = "3ac70f3e5c9cd665679b13320d0719da"
 
 # Set TTL to 12 hours (12 * 60 * 60 = 43200 seconds)
 @st.cache_data(ttl=43200) 
-def fetch_exchange_rates(): 
-    url = f"https://api.exchangeratesapi.io/v1/latest?access_key={EXCHANGE_RATE_API_KEY}&base=LKR&symbols=USD,GBP,INR"
+def fetch_exchange_rates():
+    # --- CRITICAL CHANGE: base=EUR is used instead of base=LKR ---
+    # We request rates for LKR, USD, GBP, and INR, all relative to 1 EUR.
+    url = f"https://api.exchangeratesapi.io/v1/latest?access_key={EXCHANGE_RATE_API_KEY}&base=EUR&symbols=LKR,USD,GBP,INR"
     
     try:
         # 1. Attempt the request
         resp = requests.get(url, timeout=5)
         
-        # 2. Check for successful status code (e.g., 200)
+        # 2. Check for successful status code and basic API error check
         if resp.status_code != 200:
-            # Use JSON content for better debugging if API returns an error message
             error_data = resp.json() if resp.content else {}
-            print(f"FX fetch error: Received status code {resp.status_code}. Error: {error_data.get('error', {}).get('type', 'N/A')}")
+            print(f"FX fetch error (Status {resp.status_code}): {error_data.get('error', {}).get('type', 'N/A')}")
             return None # Return None on failure
 
         # 3. Attempt to parse JSON
         data = resp.json()
-        
-        # 4. Check for expected data keys (robustness)
         rates = data.get("rates", {})
-        if not rates:
-            print("FX fetch error: 'rates' key missing or empty in API response.")
+        
+        # 4. Check for required data keys
+        if not rates or 'LKR' not in rates or 'USD' not in rates or 'GBP' not in rates or 'INR' not in rates:
+            print("FX fetch error: One or more required rates (LKR, USD, GBP, INR) missing from API response.")
             return None
 
-        # Success: Return the mapped data
+        # --- CORE CALCULATION LOGIC (Deriving LKR rates from EUR base) ---
+        
+        # 1. Get the raw rates (how many units of currency X equal 1 EUR)
+        lkr_per_eur = rates.get("LKR") # Example: 359.38
+        usd_per_eur = rates.get("USD") # Example: 1.0850
+        gbp_per_eur = rates.get("GBP") # Example: 0.8550
+        inr_per_eur = rates.get("INR") # Example: 96.00
+        
+        # 2. Calculate the "LKR_to_FC" rate (i.e., Foreign Currency per 1 LKR).
+        # Formula: Rate(FC/LKR) = Rate(FC/EUR) / Rate(LKR/EUR)
+        
+        lkr_to_usd = usd_per_eur / lkr_per_eur # e.g., 1.0850 / 359.38 = ~0.003019
+        lkr_to_gbp = gbp_per_eur / lkr_per_eur # e.g., 0.8550 / 359.38 = ~0.002379
+        lkr_to_inr = inr_per_eur / lkr_per_eur # e.g., 96.00 / 359.38 = ~0.26714
+        
+        # Success: Return the mapped data in the format expected by the Home page (FC per 1 LKR)
         return {
-            "LKR_to_USD": rates.get("USD"),
-            "LKR_to_GBP": rates.get("GBP"),
-            "LKR_to_INR": rates.get("INR"),
+            "LKR_to_USD": lkr_to_usd,
+            "LKR_to_GBP": lkr_to_gbp,
+            "LKR_to_INR": lkr_to_inr,
             "timestamp": data.get("date") # Standard date key for exchangeratesapi.io
         }
         
@@ -189,7 +205,7 @@ def fetch_exchange_rates():
         return None
         
     except Exception as e:
-        print(f"FX fetch error (General Error): {e}")
+        print(f"FX fetch error (General Error during EUR Calculation): {e}")
         return None
 
 
