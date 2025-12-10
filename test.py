@@ -12,6 +12,7 @@ from streamlit_autorefresh import st_autorefresh
 # import tweepy # Removed unused import
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
+from datetime import datetime, timedelta, timezone # Ensure these imports exist at the top
 
 # -----------------------------
 # Page Config (UI Improvement 1: Set theme to 'light' or 'dark' via config)
@@ -488,7 +489,12 @@ if page == "🏠 Home":
     st.image("photo.jpg", width=800)
     st.title("🌐 CeylonScope")
     st.caption("Sri Lanka News Intelligence Dashboard")
-    st.info(f"**Data Refreshed:** {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} UTC") # UI Improvement 4: Show last refresh time
+    
+    # Define the offset for SLST (5 hours and 30 minutes)
+    SLST_OFFSET = timedelta(hours=5, minutes=30)
+    # Get the current UTC time, add the offset, and format
+    local_time = datetime.now(timezone.utc) + SLST_OFFSET
+    st.info(f"**Data Refreshed:** {local_time.strftime('%Y-%m-%d %H:%M:%S')} SLST")
 
     st.header("Quick Summary")
 
