@@ -154,8 +154,8 @@ EXCHANGE_RATE_API_KEY = "3ac70f3e5c9cd665679b13320d0719da"
 # Set TTL to 12 hours (12 * 60 * 60 = 43200 seconds)
 @st.cache_data(ttl=43200) 
 def fetch_exchange_rates():
-    # --- CRITICAL CHANGE: base=EUR is used instead of base=LKR ---
-    # We request rates for LKR, USD, GBP, and INR, all relative to 1 EUR.
+    #base=EUR is used instead of base=LKR ---
+    #request rates for LKR, USD, GBP, and INR, all relative to 1 EUR.
     url = f"https://api.exchangeratesapi.io/v1/latest?access_key={EXCHANGE_RATE_API_KEY}&base=EUR&symbols=LKR,USD,GBP,INR"
     
     try:
@@ -188,16 +188,15 @@ def fetch_exchange_rates():
         # 2. Calculate the "LKR_to_FC" rate (i.e., Foreign Currency per 1 LKR).
         # Formula: Rate(FC/LKR) = Rate(FC/EUR) / Rate(LKR/EUR)
         
-        lkr_to_usd = usd_per_eur / lkr_per_eur # e.g., 1.0850 / 359.38 = ~0.003019
-        lkr_to_gbp = gbp_per_eur / lkr_per_eur # e.g., 0.8550 / 359.38 = ~0.002379
-        lkr_to_inr = inr_per_eur / lkr_per_eur # e.g., 96.00 / 359.38 = ~0.26714
+        lkr_to_usd = usd_per_eur / lkr_per_eur 
+        lkr_to_gbp = gbp_per_eur / lkr_per_eur 
+        lkr_to_inr = inr_per_eur / lkr_per_eur 
         
-        # Success: Return the mapped data in the format expected by the Home page (FC per 1 LKR)
         return {
             "LKR_to_USD": lkr_to_usd,
             "LKR_to_GBP": lkr_to_gbp,
             "LKR_to_INR": lkr_to_inr,
-            "timestamp": data.get("date") # Standard date key for exchangeratesapi.io
+            "timestamp": data.get("date") 
         }
         
     except requests.exceptions.RequestException as e:
