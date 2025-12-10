@@ -12,10 +12,10 @@ from streamlit_autorefresh import st_autorefresh
 import tweepy 
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
-from datetime import datetime, timedelta, timezone # Ensure these imports exist at the top
+from datetime import datetime, timedelta, timezone 
 
 # -----------------------------
-# Page Config (UI Improvement 1: Set theme to 'light' or 'dark' via config)
+# Page Config 
 # -----------------------------
 st.set_page_config(
     page_title="News Intelligence Dashboard",
@@ -26,7 +26,6 @@ st.set_page_config(
 # -----------------------------
 # Sidebar Navigation
 # -----------------------------
-# UI Improvement 2: Use icons for navigation for better visual appeal
 page = st.sidebar.radio(
     "Navigation",
     ["🏠 Home", "📰 Latest News", "📈 Analytics", "⚠️ Risk Signals"]
@@ -154,10 +153,7 @@ EXCHANGE_RATE_API_KEY = "3ac70f3e5c9cd665679b13320d0719da"
 
 # Set TTL to 12 hours (12 * 60 * 60 = 43200 seconds)
 @st.cache_data(ttl=43200) 
-def fetch_exchange_rates():
-    # Using your new API structure with the key
-    # NOTE: Free tiers often require 'base=EUR'. If 'base=LKR' fails, change it to EUR 
-    # and adjust the calculation logic (which is more complex). We assume LKR works first.
+def fetch_exchange_rates(): 
     url = f"https://api.exchangeratesapi.io/v1/latest?access_key={EXCHANGE_RATE_API_KEY}&base=LKR&symbols=USD,GBP,INR"
     
     try:
@@ -301,8 +297,6 @@ def fetch_gdelt(days_back = 7):
 def preprocess(df):
     if df.empty:
         return df
-
-    # Always work on a copy
     df = df.copy()
 
     # -------------------------
@@ -368,7 +362,7 @@ except:
 # -----------------------------
 # Fetch new data
 # -----------------------------
-# @st.cache_data(ttl=3600) # Caching is done implicitly by calling the functions
+# @st.cache_data(ttl=3600)
 @st.cache_data(ttl=600)
 def get_all_new_data():
     new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)
@@ -429,9 +423,6 @@ if not all_news.empty:
 
     # Only proceed if we have rows to process
     if len(all_news) > 0:
-        # Debug: check number of rows to encode
-        # print("Encoding rows:", all_news.shape[0]) # Removed for cleaner console
-
         # Text embeddings
         X_text = all_news["Content"].tolist()
         # Handle the case where embedder might be the SentenceTransformer object or a string
@@ -498,7 +489,6 @@ if page == "🏠 Home":
 
     st.header("Quick Summary")
 
-    # UI Improvement 5: Using tabs for time comparison
     tab1, tab2 = st.tabs(["**Last 12 Hours**", "**Last 3 Hours**"])
 
     # --- Last 12 Hours ---
