@@ -1,7 +1,15 @@
-Dementia-Prediction File is the colab generated file with all information
+notebooks
+  model_train.ipynb - model training part using Catboost to train news catagorizing model(catagory_model.pkl)
+  preprocess.ipynb - pre processing method used in training process of the dataset
+  
+app.py - a sample code to build the streamlit app #ignore it
 
-Dementia_model.pkl is the trained model
+catagory_model.pkl - catboost model used for news catagorization in the system 
 
-model_columns.pkl is the column header list
+photo.jpg - used as a photo in UI  
 
-streamlit-app.py contains the code to streamlit app
+requirment.txt - necessary python packages
+
+sample.csv - sample news used to test the system
+
+test.py - python code used to build the streamlit application 
