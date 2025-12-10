@@ -9,7 +9,7 @@ from bs4 import BeautifulSoup
 from sentence_transformers import SentenceTransformer
 import plotly.express as px
 from streamlit_autorefresh import st_autorefresh
-# import tweepy # Removed unused import
+import tweepy 
 from wordcloud import WordCloud
 import matplotlib.pyplot as plt
 from datetime import datetime, timedelta, timezone # Ensure these imports exist at the top
