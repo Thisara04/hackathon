@@ -148,10 +148,16 @@ def fetch_twitter(days_back=7):
         print("Twitter fetch error:", e)
         return pd.DataFrame()
 
-@st.cache_data(ttl=1800)
+
+EXCHANGE_RATE_API_KEY = "3ac70f3e5c9cd665679b13320d0719da"
+
+# Set TTL to 12 hours (12 * 60 * 60 = 43200 seconds)
+@st.cache_data(ttl=43200) 
 def fetch_exchange_rates():
-    # Use a more reliable, simple API
-    url = "https://open.er-api.com/v6/latest/LKR" 
+    # Using your new API structure with the key
+    # NOTE: Free tiers often require 'base=EUR'. If 'base=LKR' fails, change it to EUR 
+    # and adjust the calculation logic (which is more complex). We assume LKR works first.
+    url = f"https://api.exchangeratesapi.io/v1/latest?access_key={EXCHANGE_RATE_API_KEY}&base=LKR&symbols=USD,GBP,INR"
     
     try:
         # 1. Attempt the request
@@ -159,7 +165,9 @@ def fetch_exchange_rates():
         
         # 2. Check for successful status code (e.g., 200)
         if resp.status_code != 200:
-            print(f"FX fetch error: Received status code {resp.status_code} from API.")
+            # Use JSON content for better debugging if API returns an error message
+            error_data = resp.json() if resp.content else {}
+            print(f"FX fetch error: Received status code {resp.status_code}. Error: {error_data.get('error', {}).get('type', 'N/A')}")
             return None # Return None on failure
 
         # 3. Attempt to parse JSON
@@ -176,22 +184,16 @@ def fetch_exchange_rates():
             "LKR_to_USD": rates.get("USD"),
             "LKR_to_GBP": rates.get("GBP"),
             "LKR_to_INR": rates.get("INR"),
-            # The new API uses this key for the timestamp
-            "timestamp": data.get("time_last_update_utc") 
+            "timestamp": data.get("date") # Standard date key for exchangeratesapi.io
         }
-
+        
     except requests.exceptions.RequestException as e:
-        # Catches all network/connection/timeout errors
         print(f"FX fetch error (Connection/Timeout): {e}")
-        return None # Return None on connection failure
+        return None
         
     except Exception as e:
-        # Catches JSON decoding or any other unexpected error
         print(f"FX fetch error (General Error): {e}")
-        return None # Return None on general failure
-
-# NOTE: The homepage code below will now use the fallback/placeholder values 
-# if this function returns None, ensuring the app doesn't crash.
+        return None
 
 
 
@@ -366,6 +368,7 @@ except:
 # Fetch new data
 # -----------------------------
 # @st.cache_data(ttl=3600) # Caching is done implicitly by calling the functions
+@st.cache_data(ttl=600)
 def get_all_new_data():
     new_rss = pd.concat([fetch_rss(url) for url in RSS_FEEDS], ignore_index=True)
     if len(new_rss) > 0:
@@ -530,7 +533,7 @@ if page == "🏠 Home":
         fx = {
             "LKR_to_USD": 0.0033,
             "LKR_to_GBP": 0.0026,
-            "LKR_to_INR": 0.2750
+            "LKR_to_INR": 0.2912
         }
 
     usd = fx.get("LKR_to_USD")
